@@ -265,6 +265,34 @@
   }
   @media (max-width:430px){ #infoHead h2{font-size:1.25rem;} #infoBody p{font-size:.86rem;} }
 
+  /* ============ phone: reclaim vertical space + easier touch ============ */
+  @media (max-width:640px){
+    #title{font-size:.95rem;letter-spacing:1.2px;padding:3px 0 0;}
+    #title small{display:none;}                 /* drop the subtitle line */
+    #controls{gap:3px;margin-top:2px;}
+    .bar{padding:3px 6px;gap:4px;border-radius:10px;}
+    .bar label{display:none;}                    /* hide "Colour by / Sort by / Theme" text */
+    .seg{padding:2px;} .seg button{padding:5px 11px;font-size:.72rem;}
+    .bar button,.bar select,#search,.ddbtn,#sortDir{font-size:.72rem;padding:5px 9px;}
+    .bar select{max-width:118px;}
+    #search{width:42vw;min-width:120px;}
+    #themeSel{display:none;}                      /* least-essential on phones (cosmic default) */
+    #caption{display:none;}                       /* the tip pill eats a whole row */
+    .gp{min-width:22px;height:21px;font-size:.6rem;}
+  }
+  /* let the table area breathe: bigger touch targets, no accidental text-select on drag */
+  @media (pointer:coarse){
+    .element{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+    #container{touch-action:none;}
+    /* easier-to-hit controls on touch */
+    .bar button,.bar select,#search,.ddbtn,#sortDir{min-height:40px;}
+    .seg button{min-height:36px;}
+    .ddmenu{max-width:min(78vw,240px);}
+    .ddmenu label{padding:9px 6px;}           /* bigger checkbox rows */
+    .ddmenu input{width:18px;height:18px;}
+    #zoomctl{transform:translateY(-50%) scale(1.05);}
+  }
+
   /* block-layer navigator (grid mode) */
   #layernav{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:6;
     display:none;align-items:center;gap:8px;
@@ -734,6 +762,7 @@
   <script>
   const reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   let tempK = 298;      // phase-at-temperature slider (kelvin)
+  let NATIVE_TZOOM = false;   // true on touch: OrbitControls handles pinch-zoom
   let lastFocus = null; // element to restore focus to when the detail overlay closes
   let THEME_NEBULA = [[80,120,255],[150,90,255],[40,180,200],[255,90,160]];
   const CATEGORY_COLORS = {
@@ -860,6 +889,12 @@
       el.innerHTML=`<div class="catbar"></div><div class="wt">${e.block}</div><div class="number">${e.n}</div>
         <div class="symbol">${e.sym}</div><div class="name">${e.name}</div><div class="mass">${(+e.mass).toFixed(2)}</div><div class="pval"></div>`;
       el.addEventListener("click",ev=>{ev.stopPropagation();openDetail(e);});
+      // Touch: OrbitControls treats a finger-down as a pan, which swallows the tap/click.
+      // Detect a genuine tap (little movement, short time) and open the card ourselves.
+      let _tx=0,_ty=0,_tt=0,_moved=false;
+      el.addEventListener("touchstart",ev=>{ const t=ev.changedTouches[0]; _tx=t.clientX;_ty=t.clientY;_tt=Date.now();_moved=false; },{passive:true});
+      el.addEventListener("touchmove",ev=>{ const t=ev.changedTouches[0]; if(Math.abs(t.clientX-_tx)>12||Math.abs(t.clientY-_ty)>12) _moved=true; },{passive:true});
+      el.addEventListener("touchend",ev=>{ if(!_moved && ev.touches.length===0 && Date.now()-_tt<500){ ev.preventDefault(); ev.stopPropagation(); openDetail(e); } },{passive:false});
       el.addEventListener("keydown",ev=>{
         if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); ev.stopPropagation(); openDetail(e); return; }
         if(curLayout==="table" && !overlay.classList.contains("show")) handleCardArrow(ev,e);
@@ -907,8 +942,18 @@
 
     controls=new THREE.OrbitControls(camera,renderer.domElement);
     controls.enableDamping=true; controls.dampingFactor=0.09;
-    controls.rotateSpeed=0.55; controls.enableZoom=false;   // zoom is via buttons/slider/Ctrl only
-    controls.enablePan=false; controls.minDistance=350; controls.maxDistance=9000;
+    controls.rotateSpeed=0.55; controls.enableZoom=false;   // desktop zoom via buttons/slider/Ctrl only
+    controls.enablePan=true; controls.screenSpacePanning=true;   // right-drag pans on desktop; one-finger pans on touch
+    controls.minDistance=350; controls.maxDistance=9000;
+    // Touch UX: one finger = drag/pan the table, two fingers = pinch-zoom. (No confusing rotate on phones.)
+    const IS_TOUCH = (window.matchMedia && matchMedia("(pointer:coarse)").matches) || ("ontouchstart" in window);
+    if(IS_TOUCH && THREE.TOUCH){
+      controls.enableZoom=true; controls.zoomSpeed=0.9;
+      controls.touches={ ONE:THREE.TOUCH.PAN, TWO:THREE.TOUCH.DOLLY_PAN };
+      NATIVE_TZOOM=true;                                    // native pinch handles zoom → skip custom pinch
+      let _st=false;
+      controls.addEventListener("change",()=>{ if(_st) return; _st=true; requestAnimationFrame(()=>{ _st=false; syncZoomSlider(); }); });
+    }
     controls.target.set(0,0,0);
 
     ["table","sphere","helix","grid"].forEach(name=>{
@@ -1829,6 +1874,7 @@
 
   // pinch-to-zoom on the main 3D scene (touch)
   function wireTouchZoom(){
+    if(NATIVE_TZOOM) return;                    // OrbitControls handles pinch-zoom on touch devices
     const el=renderer && renderer.domElement; if(!el) return;
     let d0=0;
     const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
