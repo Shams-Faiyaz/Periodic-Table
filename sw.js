@@ -1,5 +1,5 @@
 /* Periodic Table PWA service worker */
-const CACHE = "periodic-3d-v5";
+const CACHE = "periodic-3d-v6";
 
 // App shell served from our own origin (relative to the SW scope)
 const CORE = [

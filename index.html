@@ -301,6 +301,46 @@
     #zoomctl{transform:translateY(-50%) scale(1.05);}
   }
 
+  /* ============ consolidated controls for phones + tablets ============ */
+  #mbar{display:none;flex-direction:column;gap:6px;width:min(94vw,520px);pointer-events:auto;}
+  #mbar #mSearch{width:100%;background:#20242e;color:#dfe4ec;border:1px solid rgba(255,255,255,.14);
+    border-radius:10px;padding:10px 12px;font-size:.85rem;font-family:inherit;}
+  #mbar #mSearch::placeholder{color:rgba(255,255,255,.4);}
+  #mbar .mrow{display:flex;gap:8px;}
+  #mbar .mrow>*{flex:1;min-height:44px;}
+  #mbar select,#mbar #mOptionsBtn{background:#20242e;color:#eef2f8;border:1px solid rgba(255,255,255,.18);
+    border-radius:11px;padding:9px 12px;font-size:.86rem;font-family:inherit;cursor:pointer;}
+  #mbar #mOptionsBtn{font-weight:600;}
+
+  #mSheet{position:fixed;inset:0;z-index:130;display:flex;align-items:flex-start;justify-content:center;
+    padding:56px 14px 14px;background:rgba(6,8,11,.62);backdrop-filter:blur(6px);}
+  #mSheet[hidden]{display:none;}
+  .msheetcard{width:min(94vw,460px);max-height:82vh;overflow:auto;
+    background:linear-gradient(180deg,#161b24,#0e1218);border:1px solid rgba(255,255,255,.14);
+    border-radius:16px;padding:16px 16px 18px;box-shadow:0 24px 70px rgba(0,0,0,.6);}
+  .mshhead{display:flex;align-items:center;justify-content:space-between;}
+  .mshhead b{font-size:1.05rem;color:#fff;}
+  #mSheetClose{background:none;border:none;color:rgba(255,255,255,.6);font-size:1.6rem;line-height:1;cursor:pointer;}
+  .msec{font-size:.62rem;letter-spacing:1.4px;text-transform:uppercase;
+    color:color-mix(in srgb,var(--accent2) 80%,#fff);margin:15px 0 7px;}
+  #mSheet select,#mSheet button{background:#20242e;color:#eef2f8;border:1px solid rgba(255,255,255,.18);
+    border-radius:10px;padding:10px 12px;font-size:.86rem;font-family:inherit;cursor:pointer;}
+  #mColorWrap select{width:100%;}
+  #mSortWrap{gap:8px;} #mSortWrap select{flex:1;} #mSortWrap #mSortDir{flex:none;min-width:56px;}
+  #mHl{display:flex;flex-wrap:wrap;gap:8px;}
+  #mHl label{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:9px 11px;font-size:.8rem;color:#dfe6f0;cursor:pointer;}
+  #mHl input{width:17px;height:17px;accent-color:var(--accent);}
+  #mClear{width:100%;margin-top:16px;background:#2a1e24;color:#ffb3c4;border:1px solid #6a3345;
+    border-radius:11px;padding:11px;font-size:.84rem;cursor:pointer;}
+
+  @media (max-width:900px), (pointer:coarse){
+    #controls .bar, #controls #caption{display:none !important;}   /* hide desktop bars */
+    #mbar{display:flex;}                                           /* show compact bar */
+    #groupBar, #periodBar{display:none !important;}                /* replaced by Group/Period selects */
+    #zoomctl{display:none !important;}                             /* pinch-to-zoom replaces it on touch */
+  }
+
   /* block-layer navigator (grid mode) */
   #layernav{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:6;
     display:none;align-items:center;gap:8px;
@@ -628,6 +668,34 @@
       </div>
     </div>
     <div id="caption"></div>
+
+    <!-- Compact controls for phones / tablets (built + wired in JS) -->
+    <div id="mbar">
+      <input id="mSearch" placeholder="Search name / symbol / number…" autocomplete="off" aria-label="Search elements">
+      <div class="mrow">
+        <select id="mView" aria-label="View">
+          <option value="table">Table</option>
+          <option value="sphere">Sphere</option>
+          <option value="helix">Helix</option>
+          <option value="grid">Grid</option>
+        </select>
+        <button id="mOptionsBtn" type="button">Options ▾</button>
+      </div>
+      <div class="mrow">
+        <select id="mGroup" aria-label="Group"></select>
+        <select id="mPeriod" aria-label="Period"></select>
+      </div>
+    </div>
+  </div>
+
+  <div id="mSheet" hidden>
+    <div class="msheetcard">
+      <div class="mshhead"><b>Options</b><button id="mSheetClose" type="button" aria-label="Close">×</button></div>
+      <div class="msec">Colour by</div><div id="mColorWrap"></div>
+      <div class="msec">Sort by</div><div class="mrow" id="mSortWrap"></div>
+      <div class="msec">Highlight</div><div id="mHl"></div>
+      <button id="mClear" type="button">Clear all ✕</button>
+    </div>
   </div>
 
   <div id="groupBar"></div>
@@ -965,13 +1033,14 @@
     controls=new THREE.OrbitControls(camera,renderer.domElement);
     controls.enableDamping=true; controls.dampingFactor=0.09;
     controls.rotateSpeed=0.55; controls.enableZoom=false;   // desktop zoom via buttons/slider/Ctrl only
-    controls.enablePan=true; controls.screenSpacePanning=true;   // right-drag pans on desktop; one-finger pans on touch
+    controls.enablePan=true; controls.screenSpacePanning=true;   // right-drag pans on desktop
     controls.minDistance=350; controls.maxDistance=9000;
-    // Touch UX: one finger = drag/pan the table, two fingers = pinch-zoom. (No confusing rotate on phones.)
+    // Touch UX: one finger = ROTATE the 3D scene (sphere/helix/grid need this), two fingers = pinch-zoom.
+    // A quick tap still opens an element (handled per-card); a drag rotates.
     const IS_TOUCH = (window.matchMedia && matchMedia("(pointer:coarse)").matches) || ("ontouchstart" in window);
     if(IS_TOUCH && THREE.TOUCH){
       controls.enableZoom=true; controls.zoomSpeed=0.9;
-      controls.touches={ ONE:THREE.TOUCH.PAN, TWO:THREE.TOUCH.DOLLY_PAN };
+      controls.touches={ ONE:THREE.TOUCH.ROTATE, TWO:THREE.TOUCH.DOLLY_PAN };
       NATIVE_TZOOM=true;                                    // native pinch handles zoom → skip custom pinch
       let _st=false;
       controls.addEventListener("change",()=>{ if(_st) return; _st=true; requestAnimationFrame(()=>{ _st=false; syncZoomSlider(); }); });
@@ -1037,6 +1106,9 @@
     transform(targets.table,1800,fitDist.table); // gentle fly-in from scattered start
     syncZoomSlider();
     window.addEventListener("resize",onResize);
+    // Rotating a phone/tablet fires orientationchange; the viewport size settles a beat later,
+    // so re-run the layout after a short delay so nothing ends up mis-framed.
+    window.addEventListener("orientationchange",()=>{ setTimeout(onResize,250); setTimeout(onResize,600); });
   }
 
   // size the render area to the space *below* the header, and recompute fit distances
@@ -1070,6 +1142,7 @@
     cards.forEach(c=>c.el.classList.remove("dim","match"));
     if(anyFilter()) applyFilters();
     curLayout=name;
+    { const mv=document.getElementById("mView"); if(mv && ["table","sphere","helix","grid"].includes(name) && mv.value!==name) mv.value=name; }
     setCaption(name);
     const isGrid=(name==="grid"), isSphere=(name==="sphere");
     document.getElementById("layernav").style.display=isGrid?"flex":"none";
@@ -1372,6 +1445,67 @@
     if(shapes.renderer) sizeShapes();
     syncZoomSlider();
   }
+  // ---- compact mobile/tablet controls: thin proxies driving the existing desktop controls ----
+  function setGPfromSelect(kind,val,barSel){
+    filters[kind].clear();
+    document.querySelectorAll(barSel+" .gp").forEach(b=>b.classList.remove("active"));
+    if(val!=="all"){
+      filters[kind].add(val);
+      const b=[...document.querySelectorAll(barSel+" .gp")].find(x=>x.textContent.trim()===val);
+      if(b) b.classList.add("active");
+    }
+    applyFilters();
+  }
+  function buildMobileControls(){
+    const $=id=>document.getElementById(id);
+    // search → proxy the real search input
+    const mS=$("mSearch"), dS=$("search");
+    if(mS&&dS) mS.addEventListener("input",()=>{ dS.value=mS.value; dS.dispatchEvent(new Event("input")); });
+    // view select
+    const mV=$("mView");
+    if(mV){ mV.value=curLayout; mV.addEventListener("change",()=>setLayout(mV.value)); }
+    // options sheet
+    const sheet=$("mSheet");
+    if($("mOptionsBtn")) $("mOptionsBtn").addEventListener("click",()=>{ sheet.hidden=false; });
+    if($("mSheetClose")) $("mSheetClose").addEventListener("click",()=>{ sheet.hidden=true; });
+    if(sheet) sheet.addEventListener("click",e=>{ if(e.target===sheet) sheet.hidden=true; });
+    // colour-by (clone the desktop select so options never drift)
+    const cOrig=$("colorby");
+    if(cOrig){ const c=cOrig.cloneNode(true); c.id="mColor"; c.removeAttribute("aria-label"); c.value=cOrig.value;
+      c.addEventListener("change",()=>{ cOrig.value=c.value; cOrig.dispatchEvent(new Event("change")); });
+      $("mColorWrap").appendChild(c); }
+    // sort-by + direction
+    const sOrig=$("sortby");
+    if(sOrig){ const s=sOrig.cloneNode(true); s.id="mSort"; s.removeAttribute("aria-label"); s.value=sOrig.value;
+      s.addEventListener("change",()=>{ sOrig.value=s.value; sOrig.dispatchEvent(new Event("change")); });
+      const dir=document.createElement("button"); dir.type="button"; dir.id="mSortDir";
+      dir.textContent=($("sortDir")?$("sortDir").textContent.replace(/\s*(high|low).*/,"").trim():"▼")||"▼";
+      dir.addEventListener("click",()=>{ $("sortDir").click(); dir.textContent=$("sortDir").textContent.split(" ")[0]; });
+      $("mSortWrap").appendChild(s); $("mSortWrap").appendChild(dir); }
+    // highlight checkboxes (proxy the desktop ones)
+    const mHl=$("mHl");
+    if(mHl) document.querySelectorAll("#hlMenu label").forEach(lab=>{
+      const orig=lab.querySelector('input[type="checkbox"]'); if(!orig) return;
+      const w=document.createElement("label");
+      const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=orig.checked;
+      cb.addEventListener("change",()=>{ if(orig.checked!==cb.checked) orig.click(); });
+      w.appendChild(cb); w.appendChild(document.createTextNode(" "+lab.textContent.trim()));
+      w._orig=orig; mHl.appendChild(w);
+    });
+    // clear all
+    if($("mClear")) $("mClear").addEventListener("click",()=>{
+      const cf=$("clearFilters"); if(cf) cf.click();
+      document.querySelectorAll("#mHl input").forEach(c=>c.checked=false);
+      const mG=$("mGroup"), mP=$("mPeriod"); if(mG)mG.value="all"; if(mP)mP.value="all";
+    });
+    // group / period selects
+    const mG=$("mGroup"), mP=$("mPeriod");
+    if(mG){ mG.appendChild(new Option("All groups","all")); for(let g=1;g<=18;g++) mG.appendChild(new Option("Group "+g,String(g)));
+      mG.addEventListener("change",()=>setGPfromSelect("group",mG.value,"#groupBar")); }
+    if(mP){ mP.appendChild(new Option("All periods","all")); for(let p=1;p<=7;p++) mP.appendChild(new Option("Period "+p,String(p)));
+      mP.addEventListener("change",()=>setGPfromSelect("period",mP.value,"#periodBar")); }
+  }
+
   function animate(){ requestAnimationFrame(animate); if(document.hidden) return; TWEEN.update(); controls.update(); render(); if(bohr.active) renderBohr(); if(shapes.active) renderShapes(); }
   function render(){ renderer.render(scene,camera); }
 
@@ -2073,6 +2207,7 @@
 
   init();
   wireTouchZoom();
+  buildMobileControls();
   // keep the group/period bars clear of the caption when it grows to 2 lines
   try{
     const _cap=document.getElementById("caption"); let _capH=-1;
