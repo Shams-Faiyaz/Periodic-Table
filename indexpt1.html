@@ -1,0 +1,2059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0e1014">
+<meta name="description" content="Explore all 118 elements in an interactive 3D periodic table — Bohr models, orbital shapes, periodic-trend heatmaps, and live phase-at-temperature colouring.">
+<!-- PWA: installable on phone & desktop -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Periodic 3D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<title>Interactive Periodic Table · Learn Chemistry in 3D</title>
+<style>
+  :root{ --bg:#0e1014; --text:#e9edf2; --bg1:#1b2130; --bg2:#0b0d11; --accent:#5ab0ff; --accent2:#93bdff; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:radial-gradient(circle at 50% -10%,var(--bg1),var(--bg2) 60%);
+    color:var(--text);
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    overflow:hidden;
+  }
+  #bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
+  #vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(4,6,10,.55) 100%);}
+  #title,#controls,#legend,#hint{position:relative;z-index:3;}
+  #container{position:absolute;z-index:2;}
+  #title{
+    text-align:center;padding:4px 0 1px;
+    font-size:1.15rem;font-style:italic;font-weight:700;letter-spacing:.5px;
+  }
+  #title small{display:block;font-style:normal;font-weight:400;font-size:.52rem;color:rgba(255,255,255,.4);letter-spacing:1.3px;margin-top:1px;}
+
+  /* top controls — normal flow under the title (no overlap) */
+  #controls{
+    position:relative;width:100%;z-index:30;margin-top:3px;
+    display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;
+  }
+  .bar{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;pointer-events:auto;}
+  .bar button, .bar select, #search{
+    background:#20242e;color:#dfe4ec;border:1px solid rgba(255,255,255,.14);
+    border-radius:7px;padding:5px 11px;font-size:.75rem;letter-spacing:.4px;cursor:pointer;transition:.18s;
+  }
+  .bar button:hover, .bar select:hover{background:#2c313d;}
+  .bar button.active{background:#eef1f6;color:#12151b;border-color:#eef1f6;}
+  .bar label{font-size:.68rem;color:rgba(255,255,255,.5);align-self:center;margin-left:4px;}
+  .chipgrp{display:flex;gap:5px;pointer-events:auto;}
+  .chipsep{width:1px;align-self:stretch;background:rgba(255,255,255,.12);margin:2px 4px;pointer-events:none;}
+  .chip{background:#20242e;color:#cfd6e2;border:1px solid rgba(255,255,255,.14);border-radius:20px;
+    padding:5px 12px;font-size:.72rem;letter-spacing:.3px;cursor:pointer;transition:.16s;pointer-events:auto;}
+  .chip:hover{background:#2c313d;}
+  .chip.active{background:#eef1f6;color:#12151b;border-color:#eef1f6;box-shadow:0 0 12px rgba(255,255,255,.25);}
+  .chip.clearchip{opacity:.7;} .chip.clearchip:hover{opacity:1;color:#fff;background:#3a2530;border-color:#7a3a4a;}
+  #search{width:172px;cursor:text;}
+
+  /* highlight multi-select dropdown */
+  .dropdown{position:relative;pointer-events:auto;}
+  .ddbtn{background:#20242e;color:#dfe4ec;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:5px 11px;font-size:.75rem;cursor:pointer;}
+  .ddbtn:hover{background:#2c313d;} .ddbtn.on{background:#eef1f6;color:#12151b;border-color:#eef1f6;}
+  #hlCount{font-weight:700;}
+  .ddmenu{position:absolute;top:118%;left:0;z-index:40;display:none;flex-direction:column;gap:1px;min-width:172px;
+    background:#161a22;border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:8px;box-shadow:0 12px 40px rgba(0,0,0,.55);}
+  .ddmenu.open{display:flex;}
+  .ddsection{font-size:.58rem;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.4);margin:6px 2px 2px;}
+  .ddmenu label{display:flex;align-items:center;gap:8px;font-size:.78rem;color:#dfe4ec;padding:4px 5px;border-radius:5px;cursor:pointer;}
+  .ddmenu label:hover{background:#232833;}
+  .ddmenu input{accent-color:#5ab0ff;width:14px;height:14px;}
+  .ddclear{margin-top:8px;background:#2a1e24;color:#ffb3c4;border:1px solid #6a3345;border-radius:6px;padding:6px;font-size:.72rem;cursor:pointer;}
+  .ddclear:hover{background:#3a2530;}
+
+  #sortDir{background:#20242e;color:#dfe4ec;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:6px 11px;font-size:.72rem;cursor:pointer;}
+  #sortDir:hover{background:#2c313d;}
+
+  /* group (top) + period (side) selectors */
+  #groupBar{position:absolute;z-index:5;display:none;gap:3px;justify-content:center;flex-wrap:wrap;left:56px;right:56px;pointer-events:none;}
+  #periodBar{position:absolute;z-index:5;display:none;flex-direction:column;gap:3px;left:10px;pointer-events:none;}
+  .gp{pointer-events:auto;min-width:25px;height:23px;padding:0 4px;font-size:.64rem;border-radius:6px;cursor:pointer;
+    background:rgba(20,24,32,.62);color:#c8d2e0;border:1px solid rgba(255,255,255,.12);transition:.15s;}
+  .gp:hover{background:rgba(40,46,58,.85);}
+  .gp.active{background:#eef1f6;color:#12151b;border-color:#eef1f6;box-shadow:0 0 12px rgba(255,255,255,.3);}
+  .gp.gpreset{color:#ffb3c4;border-color:#6a3345;background:rgba(40,24,30,.6);font-size:.8rem;}
+  .gp.gpreset:hover{background:#3a2530;color:#fff;}
+  .gplbl{pointer-events:none;font-size:.55rem;color:rgba(255,255,255,.4);align-self:center;padding:0 4px;letter-spacing:1px;}
+
+  /* zoom control */
+  #zoomctl{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;align-items:center;gap:8px;
+    background:rgba(14,16,22,.6);border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:10px 8px;backdrop-filter:blur(5px);}
+  #zoomctl button{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:#20242e;color:#e6ebf3;font-size:1.05rem;cursor:pointer;line-height:1;}
+  #zoomctl button:hover{background:#2c313d;}
+  #zoomSlider{writing-mode:vertical-lr;direction:rtl;width:8px;height:130px;accent-color:var(--accent);cursor:pointer;}
+
+  /* bohr pause + orbital-shapes panel */
+  #bohrTools{position:absolute;top:12px;right:14px;z-index:5;display:flex;gap:8px;}
+  #bohrTools button{width:auto;min-width:34px;height:34px;padding:0 10px;border-radius:17px;
+    border:1px solid rgba(255,255,255,.2);background:rgba(20,24,32,.8);color:#fff;font-size:.8rem;font-weight:600;cursor:pointer;}
+  #bohrTools button:hover{background:rgba(40,46,58,.9);}
+  #bohrPause{padding:0;width:34px;}
+  #shapesWrap{position:absolute;inset:0;padding:0;}
+  #shapesCanvas{width:100%;height:100%;display:block;}
+  #shapesLabel{position:absolute;top:12px;left:16px;font-size:.9rem;color:#fff;font-weight:600;}
+  #shapesLegend{position:absolute;bottom:12px;left:16px;right:16px;display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:rgba(255,255,255,.82);}
+  #shapesLegend span{display:flex;align-items:center;gap:6px;}
+  #shapesLegend i{width:11px;height:11px;border-radius:3px;display:inline-block;}
+  #search::placeholder{color:rgba(255,255,255,.4);}
+  #caption{
+    font-size:.7rem;color:rgba(255,255,255,.6);max-width:640px;text-align:center;
+    background:rgba(15,18,24,.5);border:1px solid rgba(255,255,255,.06);border-radius:20px;padding:3px 14px;pointer-events:auto;
+  }
+
+  #container{position:absolute;left:0;right:0;bottom:0;top:118px;}
+
+  .element{
+    width:112px;height:140px;border-radius:8px;
+    border:1px solid color-mix(in srgb,var(--c) 62%,rgba(0,0,0,.55));
+    box-shadow:0 3px 12px rgba(0,0,0,.5), 0 0 14px color-mix(in srgb,var(--c) 30%,transparent), inset 0 1px 0 rgba(255,255,255,.08);
+    background:
+      linear-gradient(160deg,rgba(255,255,255,.06),transparent 42%),
+      radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--c) 34%,transparent),transparent 70%),
+      color-mix(in srgb,var(--c) 13%,rgba(9,11,15,.62));
+    text-align:center;cursor:pointer;overflow:hidden;
+    /* NOTE: never transition `transform` — the CSS3D renderer writes it every frame */
+    transition:box-shadow .35s ease,border-color .35s ease,opacity .4s ease,filter .4s ease;
+    backface-visibility:hidden;
+  }
+  .element:hover{box-shadow:0 0 26px color-mix(in srgb,var(--c) 95%,transparent), inset 0 1px 0 rgba(255,255,255,.14);border-color:color-mix(in srgb,var(--c) 98%,transparent);}
+  .element.dim{opacity:.12;filter:grayscale(.85);}
+  .element.layerdim{opacity:.16;filter:saturate(.6) brightness(.8);}
+  .element.gridhide{opacity:0;pointer-events:none;}
+  .element.match{box-shadow:0 0 32px #fff,0 0 60px color-mix(in srgb,var(--c) 95%,transparent);border-color:#fff;}
+  .element .catbar{position:absolute;top:0;left:0;right:0;height:5px;background:var(--c);opacity:.95;}
+  .element .number{position:absolute;top:9px;right:11px;font-size:.92rem;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.92),0 0 3px rgba(0,0,0,.85);}
+  .element .wt{position:absolute;top:9px;left:11px;font-size:.62rem;font-weight:800;letter-spacing:.5px;color:#fff;opacity:.95;text-transform:uppercase;text-shadow:0 1px 3px rgba(0,0,0,.9);}
+  .element .symbol{position:absolute;top:25px;left:0;right:0;font-size:2.05rem;font-weight:700;letter-spacing:.5px;color:#fff;text-shadow:0 2px 7px rgba(0,0,0,.72),0 0 12px color-mix(in srgb,var(--c) 85%,transparent);}
+  .element .name{position:absolute;bottom:24px;left:0;right:0;font-size:1.12rem;font-weight:700;line-height:1.02;color:#fff;padding:0 4px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 3px rgba(0,0,0,.92);}
+  .element .mass{position:absolute;bottom:7px;left:0;right:0;font-size:.84rem;font-weight:600;color:rgba(255,255,255,.9);text-shadow:0 1px 2px rgba(0,0,0,.88);}
+  .element .pval{position:absolute;bottom:6px;left:0;right:0;font-size:.82rem;font-weight:800;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 8px color-mix(in srgb,var(--c) 80%,transparent);display:none;}
+  body.sortmode .element .mass{display:none;}
+  body.sortmode .element .name{bottom:30px;font-size:.74rem;-webkit-line-clamp:1;}
+  body.sortmode .element .pval{display:block;}
+
+  /* legends */
+  #legend{position:absolute;left:14px;bottom:14px;z-index:25;display:flex;flex-direction:column;gap:4px;max-width:200px;
+    background:rgba(14,16,20,.6);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:9px 11px;backdrop-filter:blur(4px);}
+  #legend .ttl{font-size:.62rem;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:2px;}
+  #legend .row{display:flex;align-items:center;gap:8px;font-size:.68rem;color:rgba(255,255,255,.78);cursor:pointer;}
+  #legend .row.off{opacity:.35;}
+  #legend .sw{width:12px;height:12px;border-radius:3px;flex:none;box-shadow:0 0 6px currentColor;}
+  #scalebar{display:none;flex-direction:column;gap:4px;}
+  #scalebar .grad{height:12px;border-radius:3px;}
+  #scalebar .lbls{display:flex;justify-content:space-between;font-size:.6rem;color:rgba(255,255,255,.6);}
+
+  #hint{position:absolute;bottom:14px;right:70px;font-size:.68rem;color:rgba(255,255,255,.32);z-index:20;text-align:right;}
+
+  /* bottom-corner reset — recenters the current view (position + zoom) */
+  #resetView{position:fixed;right:16px;bottom:14px;z-index:26;width:46px;height:46px;border-radius:50%;
+    border:1px solid rgba(255,255,255,.18);background:rgba(20,24,32,.72);color:#eaf0f8;
+    font-size:1.4rem;line-height:1;cursor:pointer;backdrop-filter:blur(6px);
+    box-shadow:0 8px 24px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;
+    transition:background .16s ease,transform .3s ease,box-shadow .16s ease;}
+  #resetView:hover{background:rgba(44,50,62,.9);transform:rotate(-90deg);box-shadow:0 0 18px color-mix(in srgb,var(--accent) 45%,transparent);}
+  #resetView:active{transform:rotate(-200deg) scale(.92);}
+  @media (max-width:720px){ #resetView{width:42px;height:42px;bottom:12px;right:12px;} }
+
+  /* install-app button — appears only when the browser offers install */
+  #installBtn{position:fixed;top:14px;right:14px;z-index:60;
+    background:var(--accent);color:#08111d;border:none;border-radius:20px;
+    padding:9px 16px;font-family:inherit;font-size:.78rem;font-weight:700;letter-spacing:.3px;
+    cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.4);backdrop-filter:blur(6px);
+    transition:filter .16s ease,transform .1s ease;}
+  #installBtn:hover{filter:brightness(1.08);}
+  #installBtn:active{transform:translateY(1px);}
+  @media (max-width:430px){ #installBtn{font-size:0;padding:10px 12px;} #installBtn::before{content:"⬇";font-size:1rem;} }
+
+  /* ============ left info dock (Guide + About) ============ */
+  #infoDock{position:fixed;right:16px;bottom:70px;z-index:26;
+    display:flex;flex-direction:column;gap:10px;}
+  .infoBtn{width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.16);
+    background:rgba(20,24,32,.72);color:#eaf0f8;cursor:pointer;backdrop-filter:blur(6px);
+    box-shadow:0 8px 24px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;
+    transition:background .16s ease,transform .18s ease,box-shadow .16s ease;}
+  .infoBtn svg{width:22px;height:22px;display:block;}
+  .infoBtn:hover{background:rgba(44,50,62,.92);transform:translateY(-2px) scale(1.06);
+    box-shadow:0 0 18px color-mix(in srgb,var(--accent) 50%,transparent);}
+  .infoBtn:active{transform:scale(.94);}
+  @media (max-width:720px){ #infoDock{right:12px;bottom:62px;gap:9px;} .infoBtn{width:42px;height:42px;} }
+
+  /* ============ info modal (Guide / About) ============ */
+  #infoOverlay{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;
+    padding:18px;background:rgba(6,8,11,.74);backdrop-filter:blur(8px);
+    opacity:0;visibility:hidden;transition:opacity .3s ease,visibility .3s ease;}
+  #infoOverlay.show{opacity:1;visibility:visible;}
+  #infoCard{position:relative;width:min(560px,94vw);max-height:88vh;overflow:hidden;
+    background:linear-gradient(180deg,#161b24,#0e1218);
+    border:1px solid rgba(255,255,255,.12);border-radius:20px;
+    box-shadow:0 30px 90px rgba(0,0,0,.62),0 0 60px color-mix(in srgb,var(--accent) 30%,transparent);
+    display:flex;flex-direction:column;
+    transform:scale(.92) translateY(14px);opacity:.4;
+    transition:transform .36s cubic-bezier(.2,.85,.25,1),opacity .3s ease;}
+  #infoOverlay.show #infoCard{transform:scale(1) translateY(0);opacity:1;}
+  /* rotating conic glow ring behind the card */
+  #infoCard::before{content:"";position:absolute;inset:-2px;z-index:-1;border-radius:22px;
+    background:conic-gradient(from 0deg,transparent,color-mix(in srgb,var(--accent) 70%,transparent),transparent 40%,color-mix(in srgb,var(--accent2) 60%,transparent),transparent 75%);
+    filter:blur(14px);opacity:.55;animation:infospin 9s linear infinite;}
+  @keyframes infospin{to{transform:rotate(360deg);}}
+
+  #infoHead{position:relative;padding:22px 22px 16px;overflow:hidden;
+    background:radial-gradient(circle at 15% 0%,color-mix(in srgb,var(--accent) 26%,transparent),transparent 60%);
+    border-bottom:1px solid rgba(255,255,255,.08);}
+  #infoHead .eyebrow{font-family:'Roboto Mono',monospace;font-size:.6rem;letter-spacing:2.5px;
+    text-transform:uppercase;color:color-mix(in srgb,var(--accent2) 85%,#fff);opacity:.9;}
+  #infoHead h2{margin:4px 0 0;font-size:1.5rem;font-weight:700;letter-spacing:.4px;
+    background:linear-gradient(90deg,#eef4ff,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  /* orbiting electron accent in the header corner */
+  #infoHead .orbit{position:absolute;top:-26px;right:-26px;width:120px;height:120px;pointer-events:none;opacity:.5;}
+  #infoHead .orbit i{position:absolute;inset:0;border:1.5px solid color-mix(in srgb,var(--accent) 60%,transparent);
+    border-radius:50%;}
+  #infoHead .orbit i:nth-child(1){transform:rotate(0deg) scaleY(.42);}
+  #infoHead .orbit i:nth-child(2){transform:rotate(60deg) scaleY(.42);}
+  #infoHead .orbit i:nth-child(3){transform:rotate(120deg) scaleY(.42);}
+  #infoHead .orbit b{position:absolute;top:50%;left:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;
+    background:var(--accent2);box-shadow:0 0 10px var(--accent);
+    animation:orbitspin 4s linear infinite;transform-origin:-16px 0;}
+  @keyframes orbitspin{to{transform:rotate(360deg);}}
+  #infoClose{position:absolute;top:14px;right:16px;background:none;border:none;color:rgba(255,255,255,.6);
+    font-size:1.6rem;line-height:1;cursor:pointer;z-index:2;transition:color .16s,transform .16s;}
+  #infoClose:hover{color:#fff;transform:rotate(90deg);}
+
+  #infoBody{padding:18px 22px 24px;overflow:auto;}
+  #infoBody .tag{display:block;font-size:.64rem;letter-spacing:1.6px;text-transform:uppercase;
+    color:color-mix(in srgb,var(--accent2) 80%,#fff);margin:16px 0 7px;}
+  #infoBody .tag:first-child{margin-top:0;}
+  #infoBody p{font-size:.9rem;line-height:1.65;color:rgba(233,237,242,.9);margin:0 0 12px;}
+  #infoBody b{color:#fff;}
+  .infoStep{display:flex;gap:12px;align-items:flex-start;margin:10px 0;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:11px 13px;}
+  .infoStep .n{flex:none;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:'Roboto Mono',monospace;font-size:.8rem;font-weight:700;color:#08111d;
+    background:linear-gradient(180deg,var(--accent2),var(--accent));box-shadow:0 3px 10px color-mix(in srgb,var(--accent) 45%,transparent);}
+  .infoStep .t{font-size:.86rem;line-height:1.5;color:rgba(233,237,242,.92);}
+  .infoStep .t b{color:#fff;}
+  .signchip{display:inline-flex;align-items:center;gap:8px;margin:2px 0 6px;padding:7px 14px;border-radius:20px;
+    font-family:'Roboto Mono',monospace;font-size:.78rem;letter-spacing:.5px;color:#eaf2ff;
+    background:color-mix(in srgb,var(--accent) 18%,rgba(255,255,255,.04));
+    border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);}
+  .signchip .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);}
+  .oss{margin-top:6px;padding:13px 15px;border-radius:12px;
+    background:color-mix(in srgb,var(--accent) 10%,rgba(255,255,255,.03));
+    border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);}
+  .oss .tag{margin-top:0;}
+  @media (prefers-reduced-motion: reduce){
+    #infoCard::before{animation:none;}
+    #infoHead .orbit b{animation:none;}
+    #infoCard{transition:opacity .2s ease;}
+  }
+  @media (max-width:430px){ #infoHead h2{font-size:1.25rem;} #infoBody p{font-size:.86rem;} }
+
+  /* block-layer navigator (grid mode) */
+  #layernav{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:6;
+    display:none;align-items:center;gap:8px;
+    background:rgba(14,16,22,.7);border:1px solid rgba(255,255,255,.12);border-radius:30px;
+    padding:7px 12px;backdrop-filter:blur(6px);box-shadow:0 8px 30px rgba(0,0,0,.4);}
+  #layernav .arrow{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.18);
+    background:#20242e;color:#e6ebf3;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  #layernav .arrow:hover{background:#2c313d;}
+  #layernav .layers{display:flex;gap:6px;}
+  #layernav .lyr{min-width:70px;padding:5px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.14);
+    background:#20242e;cursor:pointer;text-align:center;transition:.18s;}
+  #layernav .lyr:hover{background:#2c313d;}
+  #layernav .lyr.active{background:color-mix(in srgb,var(--lc) 32%,#20242e);border-color:color-mix(in srgb,var(--lc) 80%,transparent);box-shadow:0 0 14px color-mix(in srgb,var(--lc) 45%,transparent);}
+  #layernav .lyr b{display:block;font-size:.9rem;color:#fff;}
+  #layernav .lyr span{font-size:.58rem;color:rgba(255,255,255,.6);letter-spacing:.5px;}
+  @media (max-width:720px){ #layernav .lyr{min-width:52px;} #layernav .lyr span{display:none;} }
+
+  #sphereToggle{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:6;display:none;
+    background:rgba(14,16,22,.72);border:1px solid rgba(255,255,255,.18);color:#eaf0f8;border-radius:30px;
+    padding:10px 20px;font-size:.82rem;letter-spacing:.5px;cursor:pointer;backdrop-filter:blur(6px);
+    box-shadow:0 8px 30px rgba(0,0,0,.4);transition:background .2s;}
+  #sphereToggle:hover{background:rgba(44,50,62,.85);}
+
+  #legend .row{transition:opacity .2s;}
+  #legend .row:hover{opacity:1;color:#fff;}
+
+  /* detail overlay */
+  #overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+    background:rgba(6,8,11,.72);backdrop-filter:blur(7px);
+    opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease;}
+  #overlay.show{opacity:1;visibility:visible;}
+  #card{
+    width:min(940px,94vw);height:min(630px,92vh);
+    background:linear-gradient(180deg,#161a22,#0f1218);
+    border:1px solid color-mix(in srgb,var(--c) 60%,#333);
+    border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 60px color-mix(in srgb,var(--c) 45%,transparent);
+    display:flex;flex-direction:column;overflow:hidden;
+    transform:scale(.93) translateY(10px);opacity:.4;
+    transition:transform .34s cubic-bezier(.2,.85,.25,1),opacity .3s ease;
+  }
+  #overlay.show #card{transform:scale(1) translateY(0);opacity:1;}
+  #cardHead{display:flex;align-items:center;gap:18px;padding:16px 22px;
+    background:radial-gradient(circle at 0% 0%,color-mix(in srgb,var(--c) 35%,transparent),transparent 60%);
+    border-bottom:1px solid rgba(255,255,255,.08);}
+  #cardHead .big{font-size:3.4rem;font-weight:700;line-height:1;color:#fff;text-shadow:0 0 16px color-mix(in srgb,var(--c) 90%,transparent);min-width:90px;text-align:center;}
+  #cardHead .meta h2{margin:0;font-size:1.4rem;}
+  #cardHead .meta .sub{font-size:.8rem;color:rgba(255,255,255,.6);margin-top:3px;}
+  #cardHead .badge{display:inline-block;font-size:.66rem;padding:2px 9px;border-radius:20px;margin-top:6px;
+    background:color-mix(in srgb,var(--c) 30%,transparent);border:1px solid color-mix(in srgb,var(--c) 60%,transparent);}
+  #close{margin-left:auto;background:none;border:none;color:rgba(255,255,255,.6);font-size:1.6rem;cursor:pointer;align-self:flex-start;}
+  #close:hover{color:#fff;}
+  #tabs{display:flex;gap:4px;padding:10px 18px 0;}
+  #tabs button{background:#1a1e26;border:1px solid rgba(255,255,255,.1);border-bottom:none;color:#cbd2dc;
+    padding:7px 16px;border-radius:8px 8px 0 0;font-size:.78rem;cursor:pointer;}
+  #tabs button.active{background:color-mix(in srgb,var(--c) 22%,#20242e);color:#fff;}
+  #panels{flex:1;overflow:hidden;position:relative;}
+  .panel{position:absolute;inset:0;padding:16px 22px;overflow:auto;display:none;}
+  .panel.active{display:block;}
+
+  #bohrCanvas{width:100%;height:100%;display:block;}
+  #bohrWrap{position:absolute;inset:0;padding:0;}
+  #bohrInfo{position:absolute;left:16px;bottom:14px;font-size:.72rem;color:rgba(255,255,255,.7);line-height:1.5;}
+  #bohrInfo b{color:#fff;}
+
+  .orb-row{display:flex;align-items:center;gap:10px;margin:5px 0;}
+  .orb-row .lab{width:46px;font-size:.82rem;color:#cfe;}
+  .orb-boxes{display:flex;gap:5px;}
+  .orb-box{width:30px;height:26px;border:1px solid rgba(255,255,255,.28);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.85rem;letter-spacing:-2px;color:#8fe;}
+  .orb-note{font-size:.72rem;color:rgba(255,255,255,.55);margin:2px 0 14px;}
+  .config-line{font-size:1rem;letter-spacing:.5px;margin:4px 0 16px;color:#dfefff;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 26px;}
+  .dl{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed rgba(255,255,255,.1);padding:6px 0;font-size:.84rem;}
+  .dl .k{color:rgba(255,255,255,.6);} .dl .v{color:#fff;text-align:right;}
+  .prose{font-size:.9rem;line-height:1.6;margin:2px 0 14px;}
+  .prose .tag{font-size:.66rem;letter-spacing:1px;text-transform:uppercase;color:color-mix(in srgb,var(--c) 85%,#fff);display:block;margin-bottom:3px;}
+  h4.sec{margin:14px 0 6px;font-size:.72rem;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.45);}
+
+  @media (max-width:720px){
+    #title{font-size:1.5rem;}
+    #legend{display:none;}
+    #cardHead .big{font-size:2.4rem;min-width:64px;}
+    .grid2{grid-template-columns:1fr;}
+  }
+
+  /* ================= enhancements ================= */
+  /* a11y: visible keyboard focus */
+  .bar button:focus-visible, .bar select:focus-visible, #search:focus-visible,
+  .chip:focus-visible, .ddbtn:focus-visible, .gp:focus-visible, #sortDir:focus-visible,
+  #zoomctl button:focus-visible, #tabs button:focus-visible, #layernav .lyr:focus-visible,
+  #close:focus-visible, .cardnav:focus-visible, #shareBtn:focus-visible, #sphereToggle:focus-visible,
+  #tempSlider:focus-visible, #zoomSlider:focus-visible, #legend .row:focus-visible{
+    outline:2px solid var(--accent);outline-offset:2px;}
+  .element:focus-visible{outline:3px solid #fff;outline-offset:2px;
+    box-shadow:0 0 30px color-mix(in srgb,var(--c) 95%,transparent),inset 0 1px 0 rgba(255,255,255,.14);}
+  #legend .row{outline-offset:2px;}
+
+  /* touch: send gestures to the 3D canvas instead of scrolling the page */
+  #container{touch-action:none;}
+  #bohrCanvas,#shapesCanvas{touch-action:none;}
+
+  @media (prefers-reduced-motion: reduce){
+    #bg{display:none;}                         /* stop the animated starfield */
+    .element{transition:none;}
+  }
+
+  /* phase-at-temperature slider */
+  #tempBar{display:none;align-items:center;gap:12px;pointer-events:auto;
+    background:rgba(15,18,24,.6);border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:6px 15px;}
+  #tempBar.show{display:flex;}
+  #tempBar>label{font-size:.7rem;color:rgba(255,255,255,.6);letter-spacing:.5px;}
+  #tempSlider{width:min(42vw,320px);accent-color:var(--accent);cursor:pointer;}
+  #tempVal{font-variant-numeric:tabular-nums;font-weight:700;color:#eaf2ff;min-width:118px;text-align:right;font-size:.78rem;}
+  .phasekey{display:flex;gap:12px;font-size:.66rem;color:rgba(255,255,255,.78);flex-wrap:wrap;}
+  .phasekey span{display:flex;align-items:center;gap:5px;}
+  .phasekey i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+  #tempPreset{background:#20242e;color:#dfe4ec;border:1px solid rgba(255,255,255,.14);border-radius:20px;
+    padding:5px 11px;font-size:.68rem;cursor:pointer;}
+  #tempPreset:hover{background:#2c313d;}
+
+  /* detail overlay: element stepper + share + toast */
+  #cardNav{display:flex;gap:6px;align-items:center;margin-left:auto;}
+  .cardnav{background:#1a1e26;border:1px solid rgba(255,255,255,.14);color:#dfe6f0;
+    width:34px;height:34px;border-radius:9px;font-size:1.15rem;cursor:pointer;line-height:1;}
+  .cardnav:hover{background:#2a3040;} .cardnav:disabled{opacity:.3;cursor:default;}
+  #shareBtn{background:#1a1e26;border:1px solid rgba(255,255,255,.14);color:#dfe6f0;
+    height:34px;padding:0 12px;border-radius:9px;font-size:.74rem;cursor:pointer;}
+  #shareBtn:hover{background:#2a3040;}
+  #close{margin-left:6px;}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
+    background:rgba(20,24,32,.96);border:1px solid rgba(255,255,255,.16);color:#eef2f8;
+    padding:9px 18px;border-radius:22px;font-size:.8rem;z-index:200;opacity:0;pointer-events:none;
+    transition:opacity .25s,transform .25s;max-width:80vw;text-align:center;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* mobile refinements */
+  @media (max-width:720px){
+    #tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+    #tabs::-webkit-scrollbar{display:none;}
+    #tabs button{white-space:nowrap;flex:none;}
+    #cardHead{padding:12px 14px;gap:12px;flex-wrap:wrap;}
+    #card{width:96vw;height:min(90vh,760px);}
+    #hint{display:none;}
+    #zoomctl{right:8px;padding:8px 6px;}
+    #zoomSlider{height:96px;}
+    .cardnav{width:38px;height:38px;}
+    #tempSlider{width:52vw;}
+  }
+  @media (max-width:430px){
+    #cardHead .big{font-size:2rem;min-width:52px;}
+    #cardHead .meta h2{font-size:1.15rem;}
+    #shareBtn{padding:0 9px;font-size:0;} #shareBtn::before{content:"\2197";font-size:.9rem;}
+  }
+
+  /* ============ UI/UX Pro Max — type system + glass toolbar ============ */
+  body{font-family:'Exo','Helvetica Neue',Helvetica,Arial,sans-serif;}
+  /* numeric / tabular data in a mono face for precision */
+  .element .number,.element .mass,.element .pval,.element .wt,
+  #tempVal,.dl .v,.config-line,#dSub,.gp,#hlCount,#scaleMin,#scaleMax,
+  #layernav .lyr b{font-family:'Roboto Mono',ui-monospace,monospace;}
+
+  #title{font-style:normal;font-weight:700;font-size:1.12rem;letter-spacing:2.5px;text-transform:uppercase;
+    background:linear-gradient(90deg,#eef4ff,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  #title small{font-family:'Roboto Mono',monospace;font-size:.5rem;letter-spacing:2px;
+    color:rgba(255,255,255,.4);-webkit-text-fill-color:rgba(255,255,255,.4);margin-top:2px;}
+
+  /* each control row = floating glass panel */
+  .bar{background:rgba(16,20,28,.62);border:1px solid rgba(255,255,255,.09);border-radius:12px;
+    padding:4px 7px;backdrop-filter:blur(12px);box-shadow:0 10px 34px rgba(0,0,0,.4);align-items:center;}
+  .bar label{color:rgba(255,255,255,.55);}
+
+  /* segmented view switcher */
+  .seg{display:inline-flex;gap:2px;padding:3px;border-radius:11px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);}
+  .seg button{background:transparent!important;border:none!important;border-radius:8px;
+    padding:5px 13px;font-size:.75rem;letter-spacing:.4px;text-transform:capitalize;color:#cdd6e2;
+    transition:background .18s ease,color .18s ease,box-shadow .18s ease;}
+  .seg button:hover{background:rgba(255,255,255,.09)!important;color:#fff;}
+  .seg button.active{background:#eef1f6!important;color:#12151b!important;box-shadow:0 1px 5px rgba(0,0,0,.45);}
+
+  /* consistent pill controls + clearer focus */
+  .bar select,#search,.ddbtn,#sortDir,#tempPreset{border-radius:9px;}
+  #search{transition:box-shadow .18s ease,border-color .18s ease;}
+  #search:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent);outline:none;}
+
+  #caption{font-size:.72rem;letter-spacing:.2px;line-height:1.45;}
+  #hint{font-family:'Roboto Mono',monospace;font-size:.6rem;letter-spacing:.3px;}
+
+  /* smoother, meaningful feedback when filtering/searching (transform untouched) */
+  .element{transition:box-shadow .3s ease,border-color .3s ease,opacity .32s ease,filter .32s ease;}
+
+  /* ================= auth gate ================= */
+  #authGate{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;padding:18px;
+    background:radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--bg1) 78%,transparent),rgba(6,8,12,.92) 65%);
+    backdrop-filter:blur(7px);transition:opacity .45s ease,visibility .45s ease;}
+  body:not(.gated) #authGate{opacity:0;visibility:hidden;pointer-events:none;}
+  #authCard{width:min(400px,94vw);background:linear-gradient(180deg,rgba(22,26,34,.94),rgba(14,17,23,.96));
+    border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:30px 28px 24px;
+    box-shadow:0 34px 90px rgba(0,0,0,.62),0 0 60px color-mix(in srgb,var(--accent) 16%,transparent);}
+  #authTitle{font-weight:700;font-size:1.5rem;letter-spacing:3px;text-transform:uppercase;text-align:center;
+    background:linear-gradient(90deg,#eef4ff,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .authSub{margin:8px 0 20px;text-align:center;font-size:.82rem;line-height:1.5;color:rgba(255,255,255,.62);}
+  .authTabs{display:flex;gap:3px;padding:3px;border-radius:11px;margin-bottom:18px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);}
+  .authTabs button{flex:1;background:transparent;border:none;color:#cdd6e2;padding:9px;border-radius:8px;
+    font-family:inherit;font-size:.82rem;cursor:pointer;transition:background .18s,color .18s;}
+  .authTabs button:hover{color:#fff;}
+  .authTabs button.active{background:var(--accent);color:#08111d;font-weight:600;}
+  .fld{display:block;margin-bottom:13px;}
+  .fld span{display:block;font-size:.68rem;letter-spacing:.5px;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px;}
+  .fld input{width:100%;background:#12151d;border:1px solid rgba(255,255,255,.14);border-radius:10px;
+    padding:11px 13px;color:#eef2f8;font-family:inherit;font-size:.9rem;transition:border-color .18s,box-shadow .18s;}
+  .fld input::placeholder{color:rgba(255,255,255,.32);}
+  .fld input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 28%,transparent);}
+  .autherr{min-height:16px;font-size:.74rem;color:#ff8f9e;margin:2px 2px 10px;line-height:1.35;}
+  .authprimary{width:100%;background:var(--accent);color:#08111d;border:none;border-radius:11px;
+    padding:12px;font-family:inherit;font-size:.92rem;font-weight:700;cursor:pointer;transition:filter .18s,transform .1s;}
+  .authprimary:hover{filter:brightness(1.08);} .authprimary:active{transform:translateY(1px);}
+  .authprimary:disabled{opacity:.55;cursor:default;}
+  .authdiv{display:flex;align-items:center;gap:12px;margin:18px 0;color:rgba(255,255,255,.32);font-size:.7rem;}
+  .authdiv::before,.authdiv::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.1);}
+  .authghost{width:100%;background:rgba(255,255,255,.05);color:#dfe6f0;border:1px solid rgba(255,255,255,.16);
+    border-radius:11px;padding:11px;font-family:inherit;font-size:.86rem;cursor:pointer;transition:background .18s;}
+  .authghost:hover{background:rgba(255,255,255,.1);}
+  .authnote{margin:16px 0 0;font-size:.68rem;line-height:1.45;color:rgba(255,255,255,.4);text-align:center;}
+
+  /* account chip */
+  #acct{position:fixed;top:14px;left:14px;z-index:60;}
+  #acctBtn{background:rgba(16,20,28,.7);border:1px solid rgba(255,255,255,.14);color:#eaf0f8;
+    border-radius:20px;padding:7px 15px;font-family:inherit;font-size:.76rem;cursor:pointer;backdrop-filter:blur(8px);
+    max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #acctBtn::before{content:"\25CF";color:var(--accent);margin-right:7px;font-size:.7rem;vertical-align:1px;}
+  #acctBtn:hover{background:rgba(30,36,48,.85);}
+  #acctMenu{position:absolute;top:112%;left:0;display:none;flex-direction:column;gap:6px;min-width:170px;
+    background:#161a22;border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:12px;box-shadow:0 14px 40px rgba(0,0,0,.55);}
+  #acctMenu.open{display:flex;}
+  #acctWho{font-size:.72rem;color:rgba(255,255,255,.6);word-break:break-all;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.1);}
+  #signOutBtn{background:#2a1e24;color:#ffb3c4;border:1px solid #6a3345;border-radius:8px;padding:8px;
+    font-family:inherit;font-size:.78rem;cursor:pointer;}
+  #signOutBtn:hover{background:#3a2530;color:#fff;}
+  @media (max-width:430px){ #authCard{padding:26px 20px 20px;} #acctBtn{font-size:0;padding:8px 10px;} #acctBtn::before{margin:0;font-size:.8rem;} }
+</style>
+</head>
+<body class="gated">
+  <canvas id="bg"></canvas>
+  <div id="vignette"></div>
+  <div id="title">Periodic Table<small>INTERACTIVE 3D · CLICK ANY ELEMENT TO EXPLORE</small></div>
+
+  <div id="controls">
+    <div class="bar">
+      <div class="seg" role="group" aria-label="View mode">
+        <button id="btn-table" class="active">table</button>
+        <button id="btn-sphere">sphere</button>
+        <button id="btn-helix">helix</button>
+        <button id="btn-grid">grid</button>
+      </div>
+      <input id="search" placeholder="Search name / symbol / number…" autocomplete="off" aria-label="Search elements by name, symbol, or atomic number">
+    </div>
+    <div class="bar">
+      <div class="dropdown" id="highlightDD">
+        <button class="ddbtn" id="hlBtn">Highlight ▾ <span id="hlCount"></span></button>
+        <div class="ddmenu" id="hlMenu">
+          <div class="ddsection">Metal type</div>
+          <label><input type="checkbox" data-group="type" data-k="Metal">Metals</label>
+          <label><input type="checkbox" data-group="type" data-k="Nonmetal">Nonmetals</label>
+          <label><input type="checkbox" data-group="type" data-k="Metalloid">Metalloids</label>
+          <div class="ddsection">State at 25°C</div>
+          <label><input type="checkbox" data-group="state" data-k="Solid">Solid</label>
+          <label><input type="checkbox" data-group="state" data-k="Liquid">Liquid</label>
+          <label><input type="checkbox" data-group="state" data-k="Gas">Gas</label>
+          <div class="ddsection">Block</div>
+          <label><input type="checkbox" data-group="block" data-k="s">s-block</label>
+          <label><input type="checkbox" data-group="block" data-k="p">p-block</label>
+          <label><input type="checkbox" data-group="block" data-k="d">d-block</label>
+          <label><input type="checkbox" data-group="block" data-k="f">f-block</label>
+          <button class="ddclear" id="clearFilters">Clear all ✕</button>
+        </div>
+      </div>
+      <label>Colour&nbsp;by</label>
+      <select id="colorby" aria-label="Colour elements by property">
+        <option value="cat">Category</option>
+        <option value="en">Electronegativity</option>
+        <option value="melt">Melting point</option>
+        <option value="boil">Boiling point</option>
+        <option value="radius">Atomic radius</option>
+        <option value="ie">Ionization energy</option>
+        <option value="ea">Electron affinity</option>
+        <option value="mass">Atomic mass</option>
+        <option value="density">Density</option>
+        <option value="phase">● State @ temperature</option>
+      </select>
+      <label>Sort&nbsp;by</label>
+      <select id="sortby" aria-label="Sort elements by property">
+        <option value="">Atomic number (grid)</option>
+        <option value="en">Electronegativity</option>
+        <option value="melt">Melting point</option>
+        <option value="boil">Boiling point</option>
+        <option value="radius">Atomic radius</option>
+        <option value="ie">Ionization energy</option>
+        <option value="ea">Electron affinity</option>
+        <option value="mass">Atomic mass</option>
+        <option value="density">Density</option>
+      </select>
+      <button id="sortDir" title="Toggle ascending / descending">▼ high→low</button>
+      <label>Theme</label>
+      <select id="themeSel" aria-label="Colour theme">
+        <option value="cosmic">Cosmic</option>
+        <option value="galaxy">Midnight Galaxy</option>
+        <option value="ocean">Ocean Depths</option>
+        <option value="tech">Tech Innovation</option>
+        <option value="ember">Ember Sunset</option>
+        <option value="forest">Forest</option>
+      </select>
+    </div>
+    <div class="bar" id="tempBar">
+      <label for="tempSlider">Temperature</label>
+      <input id="tempSlider" type="range" min="0" max="6000" value="298" step="1" aria-label="Temperature in kelvin">
+      <span id="tempVal">298 K · 25°C</span>
+      <button id="tempPreset" type="button" title="Reset to room temperature">room</button>
+      <div class="phasekey">
+        <span><i style="background:#8fd0ff"></i>Solid</span>
+        <span><i style="background:#6ee7a8"></i>Liquid</span>
+        <span><i style="background:#ff9d6b"></i>Gas</span>
+        <span><i style="background:#4a4f5a"></i>No data</span>
+      </div>
+    </div>
+    <div id="caption"></div>
+  </div>
+
+  <div id="groupBar"></div>
+  <div id="periodBar"></div>
+
+  <div id="zoomctl">
+    <button id="zoomIn" title="Zoom in (Ctrl +)">＋</button>
+    <input id="zoomSlider" type="range" min="0" max="100" value="50" title="Zoom" aria-label="Zoom level">
+    <button id="zoomOut" title="Zoom out (Ctrl −)">－</button>
+  </div>
+
+  <div id="container"></div>
+
+  <div id="legend">
+    <div class="ttl" id="legendTitle">Categories</div>
+    <div id="legendRows"></div>
+    <div id="scalebar"><div class="grad"></div><div class="lbls"><span id="scaleMin"></span><span id="scaleMax"></span></div></div>
+  </div>
+
+  <button id="resetView" type="button" title="Reset view — recenter &amp; zoom (R)" aria-label="Reset view position and zoom">↺</button>
+  <button id="installBtn" type="button" hidden aria-label="Install this app">⬇ Install app</button>
+
+  <!-- left dock: Guide + About -->
+  <div id="infoDock">
+    <button class="infoBtn" id="guideBtn" type="button" title="Guide — how to install &amp; use" aria-label="Open guide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11a2 2 0 0 1 2 2v13a1.5 1.5 0 0 0-1.5-1.5H5.5A1.5 1.5 0 0 1 4 16z"/>
+        <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13a2 2 0 0 0-2 2v13a1.5 1.5 0 0 1 1.5-1.5h6A1.5 1.5 0 0 0 20 16z"/>
+      </svg>
+    </button>
+    <button class="infoBtn" id="aboutBtn" type="button" title="About" aria-label="Open about">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.6" r="0.6" fill="currentColor"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Guide / About modal -->
+  <div id="infoOverlay" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+    <div id="infoCard">
+      <div id="infoHead">
+        <div class="orbit"><i></i><i></i><i></i><b></b></div>
+        <div class="eyebrow" id="infoEyebrow">Interactive Periodic Table</div>
+        <h2 id="infoTitle">Guide</h2>
+        <button id="infoClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="infoBody"></div>
+    </div>
+  </div>
+
+  <div id="hint">drag rotate · scroll pan · Ctrl+scroll zoom · keys 1–4 switch views · R reset · / search</div>
+
+  <div id="layernav">
+    <button class="arrow" id="layPrev">&#8249;</button>
+    <div class="layers" id="layerBtns"></div>
+    <button class="arrow" id="layNext">&#8250;</button>
+  </div>
+
+  <button id="sphereToggle">Step inside the sphere</button>
+
+  <!-- Detail overlay -->
+  <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="dName">
+    <div id="card">
+      <div id="cardHead">
+        <div class="big" id="dSym"></div>
+        <div class="meta">
+          <h2 id="dName"></h2>
+          <div class="sub" id="dSub"></div>
+          <span class="badge" id="dBadge"></span>
+        </div>
+        <div id="cardNav">
+          <button class="cardnav" id="prevEl" title="Previous element (←)" aria-label="Previous element">‹</button>
+          <button class="cardnav" id="nextEl" title="Next element (→)" aria-label="Next element">›</button>
+          <button id="shareBtn" title="Copy a link to this element" aria-label="Copy link to this element">Share ↗</button>
+        </div>
+        <button id="close" aria-label="Close">&times;</button>
+      </div>
+      <div id="tabs" role="tablist" aria-label="Element views">
+        <button data-t="bohr" class="active">Atom (Bohr 3D)</button>
+        <button data-t="shapes">Orbital shapes 3D</button>
+        <button data-t="orbital">Orbital diagram</button>
+        <button data-t="data">Data &amp; facts</button>
+      </div>
+      <div id="panels">
+        <div class="panel active" id="panel-bohr">
+          <div id="bohrWrap"><canvas id="bohrCanvas"></canvas></div>
+          <div id="bohrTools">
+            <button id="bohrMode" title="Switch 2D / 3D">3D</button>
+            <button id="bohrPause" title="Pause / play">⏸</button>
+          </div>
+          <div id="bohrInfo"></div>
+        </div>
+        <div class="panel" id="panel-shapes">
+          <div id="shapesWrap"><canvas id="shapesCanvas"></canvas></div>
+          <div id="shapesLabel"></div>
+          <div id="shapesLegend"></div>
+        </div>
+        <div class="panel" id="panel-orbital"></div>
+        <div class="panel" id="panel-data"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>const ELEMENTS = [{"n": 1, "sym": "H", "name": "Hydrogen", "mass": "1.0080", "cat": "Nonmetal", "col": 1, "row": 1, "cfg": "1s1", "en": 2.2, "radius": 120, "ie": 13.598, "ea": 0.754, "ox": "+1, -1", "state": "Gas", "melt": 13.81, "boil": 20.28, "density": 8.988e-05, "block": "s", "period": 1, "group": 1, "year": "1766", "shells": [1], "uses": "Fuel cells, ammonia production, refining, and rocket propellant.", "fact": "Most abundant element in the universe; makes up ~75% of normal matter."}, {"n": 2, "sym": "He", "name": "Helium", "mass": "4.00260", "cat": "Noble gas", "col": 18, "row": 1, "cfg": "1s2", "en": null, "radius": 140, "ie": 24.587, "ea": null, "ox": "0", "state": "Gas", "melt": 0.95, "boil": 4.22, "density": 0.0001785, "block": "s", "period": 1, "group": 18, "year": "1868", "shells": [2], "uses": "Balloons, MRI magnet cooling, and leak detection.", "fact": "The only element first found in space (the Sun) before Earth."}, {"n": 3, "sym": "Li", "name": "Lithium", "mass": "7.0", "cat": "Alkali metal", "col": 1, "row": 2, "cfg": "[He]2s1", "en": 0.98, "radius": 182, "ie": 5.392, "ea": 0.618, "ox": "+1", "state": "Solid", "melt": 453.65, "boil": 1615, "density": 0.534, "block": "s", "period": 2, "group": 1, "year": "1817", "shells": [2, 1], "uses": "Rechargeable batteries, mood-stabilizing medication, and lightweight alloys.", "fact": "The lightest metal; light enough to float on water."}, {"n": 4, "sym": "Be", "name": "Beryllium", "mass": "9.012183", "cat": "Alkaline earth", "col": 2, "row": 2, "cfg": "[He]2s2", "en": 1.57, "radius": 153, "ie": 9.323, "ea": null, "ox": "+2", "state": "Solid", "melt": 1560, "boil": 2744, "density": 1.85, "block": "s", "period": 2, "group": 2, "year": "1798", "shells": [2, 2], "uses": "Aerospace components, X-ray windows, and non-sparking tools.", "fact": "Transparent to X-rays, so it's used as a window in X-ray equipment."}, {"n": 5, "sym": "B", "name": "Boron", "mass": "10.81", "cat": "Metalloid", "col": 13, "row": 2, "cfg": "[He]2s2 2p1", "en": 2.04, "radius": 192, "ie": 8.298, "ea": 0.277, "ox": "+3", "state": "Solid", "melt": 2348, "boil": 4273, "density": 2.37, "block": "p", "period": 2, "group": 13, "year": "1808", "shells": [2, 3], "uses": "Borosilicate glass (Pyrex), detergents, and semiconductor doping.", "fact": "Boron compounds give a bright green color to fireworks."}, {"n": 6, "sym": "C", "name": "Carbon", "mass": "12.011", "cat": "Nonmetal", "col": 14, "row": 2, "cfg": "[He]2s2 2p2", "en": 2.55, "radius": 170, "ie": 11.26, "ea": 1.263, "ox": "+4, +2, -4", "state": "Solid", "melt": 3823, "boil": 4098, "density": 2.267, "block": "p", "period": 2, "group": 14, "year": "Ancient", "shells": [2, 4], "uses": "Steel, plastics, graphite, diamonds, and all organic life.", "fact": "Forms more compounds than any other element—the basis of life."}, {"n": 7, "sym": "N", "name": "Nitrogen", "mass": "14.007", "cat": "Nonmetal", "col": 15, "row": 2, "cfg": "[He] 2s2 2p3", "en": 3.04, "radius": 155, "ie": 14.534, "ea": null, "ox": "+5, +4, +3, +2, +1, -1, -2, -3", "state": "Gas", "melt": 63.15, "boil": 77.36, "density": 0.0012506, "block": "p", "period": 2, "group": 15, "year": "1772", "shells": [2, 5], "uses": "Fertilizers, preserving food, and making ammonia.", "fact": "Makes up 78% of the air you breathe."}, {"n": 8, "sym": "O", "name": "Oxygen", "mass": "15.999", "cat": "Nonmetal", "col": 16, "row": 2, "cfg": "[He]2s2 2p4", "en": 3.44, "radius": 152, "ie": 13.618, "ea": 1.461, "ox": "-2", "state": "Gas", "melt": 54.36, "boil": 90.2, "density": 0.001429, "block": "p", "period": 2, "group": 16, "year": "1774", "shells": [2, 6], "uses": "Breathing, steelmaking, welding, and water treatment.", "fact": "Makes up about 21% of the atmosphere and 2/3 of your body mass."}, {"n": 9, "sym": "F", "name": "Fluorine", "mass": "18.99840316", "cat": "Halogen", "col": 17, "row": 2, "cfg": "[He]2s2 2p5", "en": 3.98, "radius": 135, "ie": 17.423, "ea": 3.339, "ox": "-1", "state": "Gas", "melt": 53.53, "boil": 85.03, "density": 0.001696, "block": "p", "period": 2, "group": 17, "year": "1670", "shells": [2, 7], "uses": "Toothpaste, non-stick coatings (Teflon), and refrigerants.", "fact": "The most reactive and electronegative of all elements."}, {"n": 10, "sym": "Ne", "name": "Neon", "mass": "20.180", "cat": "Noble gas", "col": 18, "row": 2, "cfg": "[He]2s2 2p6", "en": null, "radius": 154, "ie": 21.565, "ea": null, "ox": "0", "state": "Gas", "melt": 24.56, "boil": 27.07, "density": 0.0008999, "block": "p", "period": 2, "group": 18, "year": "1898", "shells": [2, 8], "uses": "Bright glowing signs and high-voltage indicators.", "fact": "'Neon' signs glow reddish-orange; other colors use different gases."}, {"n": 11, "sym": "Na", "name": "Sodium", "mass": "22.9897693", "cat": "Alkali metal", "col": 1, "row": 3, "cfg": "[Ne]3s1", "en": 0.93, "radius": 227, "ie": 5.139, "ea": 0.548, "ox": "+1", "state": "Solid", "melt": 370.95, "boil": 1156, "density": 0.97, "block": "s", "period": 3, "group": 1, "year": "1807", "shells": [2, 8, 1], "uses": "Table salt, street lamps, and soap making.", "fact": "So reactive it explodes on contact with water; never found free in nature."}, {"n": 12, "sym": "Mg", "name": "Magnesium", "mass": "24.305", "cat": "Alkaline earth", "col": 2, "row": 3, "cfg": "[Ne]3s2", "en": 1.31, "radius": 173, "ie": 7.646, "ea": null, "ox": "+2", "state": "Solid", "melt": 923, "boil": 1363, "density": 1.74, "block": "s", "period": 3, "group": 2, "year": "1808", "shells": [2, 8, 2], "uses": "Lightweight alloys, fireworks, and antacids.", "fact": "Burns with a brilliant white light—used in old camera flashes."}, {"n": 13, "sym": "Al", "name": "Aluminum", "mass": "26.981538", "cat": "Post-transition metal", "col": 13, "row": 3, "cfg": "[Ne]3s2 3p1", "en": 1.61, "radius": 184, "ie": 5.986, "ea": 0.441, "ox": "+3", "state": "Solid", "melt": 933.437, "boil": 2792, "density": 2.7, "block": "p", "period": 3, "group": 13, "year": "Ancient", "shells": [2, 8, 3], "uses": "Cans, foil, aircraft, and window frames.", "fact": "The most abundant metal in Earth's crust."}, {"n": 14, "sym": "Si", "name": "Silicon", "mass": "28.085", "cat": "Metalloid", "col": 14, "row": 3, "cfg": "[Ne]3s2 3p2", "en": 1.9, "radius": 210, "ie": 8.152, "ea": 1.385, "ox": "+4, +2, -4", "state": "Solid", "melt": 1687, "boil": 3538, "density": 2.3296, "block": "p", "period": 3, "group": 14, "year": "1854", "shells": [2, 8, 4], "uses": "Computer chips, glass, and solar cells.", "fact": "The heart of the electronics age—'Silicon Valley' is named after it."}, {"n": 15, "sym": "P", "name": "Phosphorus", "mass": "30.97376200", "cat": "Nonmetal", "col": 15, "row": 3, "cfg": "[Ne]3s2 3p3", "en": 2.19, "radius": 180, "ie": 10.487, "ea": 0.746, "ox": "+5, +3, -3", "state": "Solid", "melt": 317.3, "boil": 553.65, "density": 1.82, "block": "p", "period": 3, "group": 15, "year": "1669", "shells": [2, 8, 5], "uses": "Fertilizers, matches, and DNA/energy molecules (ATP).", "fact": "White phosphorus glows in the dark and ignites in air."}, {"n": 16, "sym": "S", "name": "Sulfur", "mass": "32.07", "cat": "Nonmetal", "col": 16, "row": 3, "cfg": "[Ne]3s2 3p4", "en": 2.58, "radius": 180, "ie": 10.36, "ea": 2.077, "ox": "+6, +4, -2", "state": "Solid", "melt": 388.36, "boil": 717.75, "density": 2.067, "block": "p", "period": 3, "group": 16, "year": "Ancient", "shells": [2, 8, 6], "uses": "Sulfuric acid, gunpowder, rubber vulcanization, and fertilizers.", "fact": "Responsible for the smell of rotten eggs and volcanic vents."}, {"n": 17, "sym": "Cl", "name": "Chlorine", "mass": "35.45", "cat": "Halogen", "col": 17, "row": 3, "cfg": "[Ne]3s2 3p5", "en": 3.16, "radius": 175, "ie": 12.968, "ea": 3.617, "ox": "+7, +5, +1, -1", "state": "Gas", "melt": 171.65, "boil": 239.11, "density": 0.003214, "block": "p", "period": 3, "group": 17, "year": "1774", "shells": [2, 8, 7], "uses": "Disinfecting water, bleach, and PVC plastic.", "fact": "A poisonous green gas used as a chemical weapon in WWI."}, {"n": 18, "sym": "Ar", "name": "Argon", "mass": "39.9", "cat": "Noble gas", "col": 18, "row": 3, "cfg": "[Ne]3s2 3p6", "en": null, "radius": 188, "ie": 15.76, "ea": null, "ox": "0", "state": "Gas", "melt": 83.8, "boil": 87.3, "density": 0.0017837, "block": "p", "period": 3, "group": 18, "year": "1894", "shells": [2, 8, 8], "uses": "Filling light bulbs and shielding welds.", "fact": "The most abundant noble gas in Earth's atmosphere."}, {"n": 19, "sym": "K", "name": "Potassium", "mass": "39.0983", "cat": "Alkali metal", "col": 1, "row": 4, "cfg": "[Ar]4s1", "en": 0.82, "radius": 275, "ie": 4.341, "ea": 0.501, "ox": "+1", "state": "Solid", "melt": 336.53, "boil": 1032, "density": 0.89, "block": "s", "period": 4, "group": 1, "year": "1807", "shells": [2, 8, 8, 1], "uses": "Fertilizers, salt substitutes, and nerve function.", "fact": "Essential for your heartbeat and nerve signals."}, {"n": 20, "sym": "Ca", "name": "Calcium", "mass": "40.08", "cat": "Alkaline earth", "col": 2, "row": 4, "cfg": "[Ar]4s2", "en": 1, "radius": 231, "ie": 6.113, "ea": null, "ox": "+2", "state": "Solid", "melt": 1115, "boil": 1757, "density": 1.54, "block": "s", "period": 4, "group": 2, "year": "Ancient", "shells": [2, 8, 8, 2], "uses": "Bones, teeth, cement, and chalk.", "fact": "Your skeleton is built mostly from calcium compounds."}, {"n": 21, "sym": "Sc", "name": "Scandium", "mass": "44.95591", "cat": "Transition metal", "col": 3, "row": 4, "cfg": "[Ar]4s2 3d1", "en": 1.36, "radius": 211, "ie": 6.561, "ea": 0.188, "ox": "+3", "state": "Solid", "melt": 1814, "boil": 3109, "density": 2.99, "block": "d", "period": 4, "group": 3, "year": "1879", "shells": [2, 8, 9, 2], "uses": "Aerospace alloys and high-intensity stadium lights.", "fact": "Very rare and expensive; strengthens aluminium in bike frames."}, {"n": 22, "sym": "Ti", "name": "Titanium", "mass": "47.867", "cat": "Transition metal", "col": 4, "row": 4, "cfg": "[Ar]4s2 3d2", "en": 1.54, "radius": 187, "ie": 6.828, "ea": 0.079, "ox": "+4, +3, +2", "state": "Solid", "melt": 1941, "boil": 3560, "density": 4.5, "block": "d", "period": 4, "group": 4, "year": "1791", "shells": [2, 8, 10, 2], "uses": "Jet engines, medical implants, and paint pigment.", "fact": "As strong as steel but 45% lighter, and it resists corrosion."}, {"n": 23, "sym": "V", "name": "Vanadium", "mass": "50.9415", "cat": "Transition metal", "col": 5, "row": 4, "cfg": "[Ar]4s2 3d3", "en": 1.63, "radius": 179, "ie": 6.746, "ea": 0.525, "ox": "+5, +4, +3, +2", "state": "Solid", "melt": 2183, "boil": 3680, "density": 6, "block": "d", "period": 4, "group": 5, "year": "1801", "shells": [2, 8, 11, 2], "uses": "Strengthening steel for tools and springs.", "fact": "A tiny amount makes steel dramatically tougher."}, {"n": 24, "sym": "Cr", "name": "Chromium", "mass": "51.996", "cat": "Transition metal", "col": 6, "row": 4, "cfg": "[Ar]3d5 4s1", "en": 1.66, "radius": 189, "ie": 6.767, "ea": 0.666, "ox": "+6, +3, +2", "state": "Solid", "melt": 2180, "boil": 2944, "density": 7.15, "block": "d", "period": 4, "group": 6, "year": "1797", "shells": [2, 8, 13, 1], "uses": "Stainless steel, chrome plating, and green/red gem colors.", "fact": "Gives rubies their red and emeralds their green color."}, {"n": 25, "sym": "Mn", "name": "Manganese", "mass": "54.93804", "cat": "Transition metal", "col": 7, "row": 4, "cfg": "[Ar]4s2 3d5", "en": 1.55, "radius": 197, "ie": 7.434, "ea": null, "ox": "+7, +4, +3, +2", "state": "Solid", "melt": 1519, "boil": 2334, "density": 7.3, "block": "d", "period": 4, "group": 7, "year": "1774", "shells": [2, 8, 13, 2], "uses": "Steel production and dry-cell batteries.", "fact": "Essential for making strong, hard steel."}, {"n": 26, "sym": "Fe", "name": "Iron", "mass": "55.84", "cat": "Transition metal", "col": 8, "row": 4, "cfg": "[Ar]4s2 3d6", "en": 1.83, "radius": 194, "ie": 7.902, "ea": 0.163, "ox": "+3, +2", "state": "Solid", "melt": 1811, "boil": 3134, "density": 7.874, "block": "d", "period": 4, "group": 8, "year": "Ancient", "shells": [2, 8, 14, 2], "uses": "Steel, construction, tools, and carrying oxygen in blood.", "fact": "The most-used metal on Earth and the core of our planet."}, {"n": 27, "sym": "Co", "name": "Cobalt", "mass": "58.93319", "cat": "Transition metal", "col": 9, "row": 4, "cfg": "[Ar]4s2 3d7", "en": 1.88, "radius": 192, "ie": 7.881, "ea": 0.661, "ox": "+3, +2", "state": "Solid", "melt": 1768, "boil": 3200, "density": 8.86, "block": "d", "period": 4, "group": 9, "year": "1735", "shells": [2, 8, 15, 2], "uses": "Rechargeable batteries, magnets, and blue pigments.", "fact": "'Cobalt blue' has colored glass and ceramics for centuries."}, {"n": 28, "sym": "Ni", "name": "Nickel", "mass": "58.693", "cat": "Transition metal", "col": 10, "row": 4, "cfg": "[Ar]4s2 3d8", "en": 1.91, "radius": 163, "ie": 7.64, "ea": 1.156, "ox": "+3, +2", "state": "Solid", "melt": 1728, "boil": 3186, "density": 8.912, "block": "d", "period": 4, "group": 10, "year": "1751", "shells": [2, 8, 16, 2], "uses": "Stainless steel, coins, and rechargeable batteries.", "fact": "The US 'nickel' coin is only 25% nickel."}, {"n": 29, "sym": "Cu", "name": "Copper", "mass": "63.55", "cat": "Transition metal", "col": 11, "row": 4, "cfg": "[Ar]4s1 3d10", "en": 1.9, "radius": 140, "ie": 7.726, "ea": 1.228, "ox": "+2, +1", "state": "Solid", "melt": 1357.77, "boil": 2835, "density": 8.933, "block": "d", "period": 4, "group": 11, "year": "Ancient", "shells": [2, 8, 18, 1], "uses": "Electrical wiring, plumbing, and coins.", "fact": "One of the first metals ever used by humans, ~10,000 years ago."}, {"n": 30, "sym": "Zn", "name": "Zinc", "mass": "65.4", "cat": "Transition metal", "col": 12, "row": 4, "cfg": "[Ar]4s2 3d10", "en": 1.65, "radius": 139, "ie": 9.394, "ea": null, "ox": "+2", "state": "Solid", "melt": 692.68, "boil": 1180, "density": 7.134, "block": "d", "period": 4, "group": 12, "year": "1746", "shells": [2, 8, 18, 2], "uses": "Galvanizing steel, batteries, and sunscreen.", "fact": "Coats iron to stop it rusting (galvanization)."}, {"n": 31, "sym": "Ga", "name": "Gallium", "mass": "69.723", "cat": "Post-transition metal", "col": 13, "row": 4, "cfg": "[Ar]4s2 3d10 4p1", "en": 1.81, "radius": 187, "ie": 5.999, "ea": 0.3, "ox": "+3", "state": "Solid", "melt": 302.91, "boil": 2477, "density": 5.91, "block": "p", "period": 4, "group": 13, "year": "1875", "shells": [2, 8, 18, 3], "uses": "LEDs, solar panels, and semiconductors.", "fact": "Melts in your hand—its melting point is just ~30°C."}, {"n": 32, "sym": "Ge", "name": "Germanium", "mass": "72.63", "cat": "Metalloid", "col": 14, "row": 4, "cfg": "[Ar]4s2 3d10 4p2", "en": 2.01, "radius": 211, "ie": 7.9, "ea": 1.35, "ox": "+4, +2", "state": "Solid", "melt": 1211.4, "boil": 3106, "density": 5.323, "block": "p", "period": 4, "group": 14, "year": "1886", "shells": [2, 8, 18, 4], "uses": "Fiber optics, infrared lenses, and early transistors.", "fact": "Used in the first transistors before silicon took over."}, {"n": 33, "sym": "As", "name": "Arsenic", "mass": "74.92159", "cat": "Metalloid", "col": 15, "row": 4, "cfg": "[Ar]4s2 3d10 4p3", "en": 2.18, "radius": 185, "ie": 9.815, "ea": 0.81, "ox": "+5, +3, -3", "state": "Solid", "melt": 1090, "boil": 887, "density": 5.776, "block": "p", "period": 4, "group": 15, "year": "Ancient", "shells": [2, 8, 18, 5], "uses": "Semiconductors, wood preservatives, and (historically) poison.", "fact": "A famous poison once called 'inheritance powder'."}, {"n": 34, "sym": "Se", "name": "Selenium", "mass": "78.97", "cat": "Nonmetal", "col": 16, "row": 4, "cfg": "[Ar]4s2 3d10 4p4", "en": 2.55, "radius": 190, "ie": 9.752, "ea": 2.021, "ox": "+6, +4, -2", "state": "Solid", "melt": 493.65, "boil": 958, "density": 4.809, "block": "p", "period": 4, "group": 16, "year": "1817", "shells": [2, 8, 18, 6], "uses": "Photocopiers, glass coloring, and a vital trace nutrient.", "fact": "Its electrical resistance changes with light—used in photocells."}, {"n": 35, "sym": "Br", "name": "Bromine", "mass": "79.90", "cat": "Halogen", "col": 17, "row": 4, "cfg": "[Ar]4s2 3d10 4p5", "en": 2.96, "radius": 183, "ie": 11.814, "ea": 3.365, "ox": "+5, +1, -1", "state": "Liquid", "melt": 265.95, "boil": 331.95, "density": 3.11, "block": "p", "period": 4, "group": 17, "year": "1826", "shells": [2, 8, 18, 7], "uses": "Flame retardants, photography, and water treatment.", "fact": "One of only two elements that are liquid at room temperature."}, {"n": 36, "sym": "Kr", "name": "Krypton", "mass": "83.80", "cat": "Noble gas", "col": 18, "row": 4, "cfg": "[Ar]4s2 3d10 4p6", "en": 3, "radius": 202, "ie": 14, "ea": null, "ox": "0", "state": "Gas", "melt": 115.79, "boil": 119.93, "density": 0.003733, "block": "p", "period": 4, "group": 18, "year": "1898", "shells": [2, 8, 18, 8], "uses": "High-performance lighting and photographic flashes.", "fact": "Once used to define the length of a meter."}, {"n": 37, "sym": "Rb", "name": "Rubidium", "mass": "85.468", "cat": "Alkali metal", "col": 1, "row": 5, "cfg": "[Kr]5s1", "en": 0.82, "radius": 303, "ie": 4.177, "ea": 0.468, "ox": "+1", "state": "Solid", "melt": 312.46, "boil": 961, "density": 1.53, "block": "s", "period": 5, "group": 1, "year": "1861", "shells": [2, 8, 18, 8, 1], "uses": "Atomic clocks and specialty glass.", "fact": "So reactive it ignites instantly in air."}, {"n": 38, "sym": "Sr", "name": "Strontium", "mass": "87.62", "cat": "Alkaline earth", "col": 2, "row": 5, "cfg": "[Kr]5s2", "en": 0.95, "radius": 249, "ie": 5.695, "ea": null, "ox": "+2", "state": "Solid", "melt": 1050, "boil": 1655, "density": 2.64, "block": "s", "period": 5, "group": 2, "year": "1790", "shells": [2, 8, 18, 8, 2], "uses": "Red fireworks and flares, and glow-in-the-dark paint.", "fact": "Gives fireworks their brilliant red color."}, {"n": 39, "sym": "Y", "name": "Yttrium", "mass": "88.90584", "cat": "Transition metal", "col": 3, "row": 5, "cfg": "[Kr]5s2 4d1", "en": 1.22, "radius": 219, "ie": 6.217, "ea": 0.307, "ox": "+3", "state": "Solid", "melt": 1795, "boil": 3618, "density": 4.47, "block": "d", "period": 5, "group": 3, "year": "1794", "shells": [2, 8, 18, 9, 2], "uses": "LED phosphors, lasers, and superconductors.", "fact": "Key ingredient in the red phosphors of older TV screens."}, {"n": 40, "sym": "Zr", "name": "Zirconium", "mass": "91.22", "cat": "Transition metal", "col": 4, "row": 5, "cfg": "[Kr]5s2 4d2", "en": 1.33, "radius": 186, "ie": 6.634, "ea": 0.426, "ox": "+4", "state": "Solid", "melt": 2128, "boil": 4682, "density": 6.52, "block": "d", "period": 5, "group": 4, "year": "1789", "shells": [2, 8, 18, 10, 2], "uses": "Nuclear reactor cladding and fake diamonds (cubic zirconia).", "fact": "Extremely resistant to heat and corrosion."}, {"n": 41, "sym": "Nb", "name": "Niobium", "mass": "92.90637", "cat": "Transition metal", "col": 5, "row": 5, "cfg": "[Kr]5s1 4d4", "en": 1.6, "radius": 207, "ie": 6.759, "ea": 0.893, "ox": "+5, +3", "state": "Solid", "melt": 2750, "boil": 5017, "density": 8.57, "block": "d", "period": 5, "group": 5, "year": "1801", "shells": [2, 8, 18, 12, 1], "uses": "Superconducting magnets (MRI) and strong steel alloys.", "fact": "Used in the magnets of particle accelerators like the LHC."}, {"n": 42, "sym": "Mo", "name": "Molybdenum", "mass": "95.95", "cat": "Transition metal", "col": 6, "row": 5, "cfg": "[Kr]5s1 4d5", "en": 2.16, "radius": 209, "ie": 7.092, "ea": 0.746, "ox": "+6", "state": "Solid", "melt": 2896, "boil": 4912, "density": 10.2, "block": "d", "period": 5, "group": 6, "year": "1778", "shells": [2, 8, 18, 13, 1], "uses": "High-strength steel, lubricants, and catalysts.", "fact": "Withstands extreme heat—used in furnace parts and armor."}, {"n": 43, "sym": "Tc", "name": "Technetium", "mass": "96.90636", "cat": "Transition metal", "col": 7, "row": 5, "cfg": "[Kr]5s2 4d5", "en": 1.9, "radius": 209, "ie": 7.28, "ea": 0.55, "ox": "+7, +6, +4", "state": "Solid", "melt": 2430, "boil": 4538, "density": 11, "block": "d", "period": 5, "group": 7, "year": "1937", "shells": [2, 8, 18, 13, 2], "uses": "Medical imaging (bone and organ scans).", "fact": "The first artificially made element; all of it is radioactive."}, {"n": 44, "sym": "Ru", "name": "Ruthenium", "mass": "101.1", "cat": "Transition metal", "col": 8, "row": 5, "cfg": "[Kr]5s1 4d7", "en": 2.2, "radius": 207, "ie": 7.361, "ea": 1.05, "ox": "+3", "state": "Solid", "melt": 2607, "boil": 4423, "density": 12.1, "block": "d", "period": 5, "group": 8, "year": "1827", "shells": [2, 8, 18, 15, 1], "uses": "Electronics, solar cells, and wear-resistant contacts.", "fact": "Added to platinum and palladium to make them harder."}, {"n": 45, "sym": "Rh", "name": "Rhodium", "mass": "102.9055", "cat": "Transition metal", "col": 9, "row": 5, "cfg": "[Kr]5s1 4d8", "en": 2.28, "radius": 195, "ie": 7.459, "ea": 1.137, "ox": "+3", "state": "Solid", "melt": 2237, "boil": 3968, "density": 12.4, "block": "d", "period": 5, "group": 9, "year": "1803", "shells": [2, 8, 18, 16, 1], "uses": "Catalytic converters and reflective coatings.", "fact": "One of the rarest and most expensive precious metals."}, {"n": 46, "sym": "Pd", "name": "Palladium", "mass": "106.42", "cat": "Transition metal", "col": 10, "row": 5, "cfg": "[Kr]4d10", "en": 2.2, "radius": 202, "ie": 8.337, "ea": 0.557, "ox": "+3, +2", "state": "Solid", "melt": 1828.05, "boil": 3236, "density": 12, "block": "d", "period": 5, "group": 10, "year": "1803", "shells": [2, 8, 18, 18], "uses": "Catalytic converters, electronics, and jewelry.", "fact": "Can absorb up to 900 times its own volume in hydrogen gas."}, {"n": 47, "sym": "Ag", "name": "Silver", "mass": "107.868", "cat": "Transition metal", "col": 11, "row": 5, "cfg": "[Kr]5s1 4d10", "en": 1.93, "radius": 172, "ie": 7.576, "ea": 1.302, "ox": "+1", "state": "Solid", "melt": 1234.93, "boil": 2435, "density": 10.501, "block": "d", "period": 5, "group": 11, "year": "Ancient", "shells": [2, 8, 18, 18, 1], "uses": "Jewelry, electronics, mirrors, and antibacterial coatings.", "fact": "The best electrical and thermal conductor of all metals."}, {"n": 48, "sym": "Cd", "name": "Cadmium", "mass": "112.41", "cat": "Transition metal", "col": 12, "row": 5, "cfg": "[Kr]5s2 4d10", "en": 1.69, "radius": 158, "ie": 8.994, "ea": null, "ox": "+2", "state": "Solid", "melt": 594.22, "boil": 1040, "density": 8.69, "block": "d", "period": 5, "group": 12, "year": "1817", "shells": [2, 8, 18, 18, 2], "uses": "Rechargeable batteries and pigments (now limited for toxicity).", "fact": "Gives the bright yellow of 'cadmium yellow' paint."}, {"n": 49, "sym": "In", "name": "Indium", "mass": "114.818", "cat": "Post-transition metal", "col": 13, "row": 5, "cfg": "[Kr]5s2 4d10 5p1", "en": 1.78, "radius": 193, "ie": 5.786, "ea": 0.3, "ox": "+3", "state": "Solid", "melt": 429.75, "boil": 2345, "density": 7.31, "block": "p", "period": 5, "group": 13, "year": "1863", "shells": [2, 8, 18, 18, 3], "uses": "Touchscreens and flat-panel displays (indium tin oxide).", "fact": "Makes a high-pitched 'cry' when you bend it."}, {"n": 50, "sym": "Sn", "name": "Tin", "mass": "118.71", "cat": "Post-transition metal", "col": 14, "row": 5, "cfg": "[Kr]5s2 4d10 5p2", "en": 1.96, "radius": 217, "ie": 7.344, "ea": 1.2, "ox": "+4, +2", "state": "Solid", "melt": 505.08, "boil": 2875, "density": 7.287, "block": "p", "period": 5, "group": 14, "year": "Ancient", "shells": [2, 8, 18, 18, 4], "uses": "Solder, tin cans, and bronze alloys.", "fact": "Bends with a crackling 'tin cry' sound."}, {"n": 51, "sym": "Sb", "name": "Antimony", "mass": "121.760", "cat": "Metalloid", "col": 15, "row": 5, "cfg": "[Kr]5s2 4d10 5p3", "en": 2.05, "radius": 206, "ie": 8.64, "ea": 1.07, "ox": "+5, +3, -3", "state": "Solid", "melt": 903.78, "boil": 1860, "density": 6.685, "block": "p", "period": 5, "group": 15, "year": "Ancient", "shells": [2, 8, 18, 18, 5], "uses": "Flame retardants, batteries, and alloys.", "fact": "Used since ancient Egypt as black eye makeup (kohl)."}, {"n": 52, "sym": "Te", "name": "Tellurium", "mass": "127.6", "cat": "Metalloid", "col": 16, "row": 5, "cfg": "[Kr]5s2 4d10 5p4", "en": 2.1, "radius": 206, "ie": 9.01, "ea": 1.971, "ox": "+6, +4, -2", "state": "Solid", "melt": 722.66, "boil": 1261, "density": 6.232, "block": "p", "period": 5, "group": 16, "year": "1782", "shells": [2, 8, 18, 18, 6], "uses": "Solar panels, alloys, and tinting glass.", "fact": "Gives your breath a garlic smell even in tiny amounts."}, {"n": 53, "sym": "I", "name": "Iodine", "mass": "126.9045", "cat": "Halogen", "col": 17, "row": 5, "cfg": "[Kr]5s2 4d10 5p5", "en": 2.66, "radius": 198, "ie": 10.451, "ea": 3.059, "ox": "+7, +5, +1, -1", "state": "Solid", "melt": 386.85, "boil": 457.55, "density": 4.93, "block": "p", "period": 5, "group": 17, "year": "1811", "shells": [2, 8, 18, 18, 7], "uses": "Antiseptics, thyroid health, and photography.", "fact": "Essential in your diet—added to 'iodized' table salt."}, {"n": 54, "sym": "Xe", "name": "Xenon", "mass": "131.29", "cat": "Noble gas", "col": 18, "row": 5, "cfg": "[Kr]5s2 4d10 5p6", "en": 2.6, "radius": 216, "ie": 12.13, "ea": null, "ox": "0", "state": "Gas", "melt": 161.36, "boil": 165.03, "density": 0.005887, "block": "p", "period": 5, "group": 18, "year": "1898", "shells": [2, 8, 18, 18, 8], "uses": "Car headlights, anesthesia, and ion engines.", "fact": "Powers ion thrusters on deep-space probes."}, {"n": 55, "sym": "Cs", "name": "Cesium", "mass": "132.9054520", "cat": "Alkali metal", "col": 1, "row": 6, "cfg": "[Xe]6s1", "en": 0.79, "radius": 343, "ie": 3.894, "ea": 0.472, "ox": "+1", "state": "Solid", "melt": 301.59, "boil": 944, "density": 1.93, "block": "s", "period": 6, "group": 1, "year": "1860", "shells": [2, 8, 18, 18, 8, 1], "uses": "Atomic clocks—the world's definition of a second.", "fact": "The second most reactive metal; melts near body temperature."}, {"n": 56, "sym": "Ba", "name": "Barium", "mass": "137.33", "cat": "Alkaline earth", "col": 2, "row": 6, "cfg": "[Xe]6s2", "en": 0.89, "radius": 268, "ie": 5.212, "ea": null, "ox": "+2", "state": "Solid", "melt": 1000, "boil": 2170, "density": 3.62, "block": "s", "period": 6, "group": 2, "year": "1808", "shells": [2, 8, 18, 18, 8, 2], "uses": "Medical 'barium meal' X-rays and green fireworks.", "fact": "Patients drink barium so their gut shows up on X-rays."}, {"n": 57, "sym": "La", "name": "Lanthanum", "mass": "138.9055", "cat": "Lanthanide", "col": 4, "row": 9, "cfg": "[Xe]6s2 5d1", "en": 1.1, "radius": 240, "ie": 5.577, "ea": 0.5, "ox": "+3", "state": "Solid", "melt": 1191, "boil": 3737, "density": 6.15, "block": "f", "period": 6, "group": "—", "year": "1839", "shells": [2, 8, 18, 18, 9, 2], "uses": "Camera lenses, hybrid car batteries, and lighter flints.", "fact": "'Lanthanum' means 'to lie hidden' in Greek."}, {"n": 58, "sym": "Ce", "name": "Cerium", "mass": "140.116", "cat": "Lanthanide", "col": 5, "row": 9, "cfg": "[Xe]6s2 4f1 5d1", "en": 1.12, "radius": 235, "ie": 5.539, "ea": 0.5, "ox": "+4, +3", "state": "Solid", "melt": 1071, "boil": 3697, "density": 6.77, "block": "f", "period": 6, "group": "—", "year": "1803", "shells": [2, 8, 18, 19, 9, 2], "uses": "Self-cleaning ovens, catalytic converters, and glass polishing.", "fact": "The most abundant of the rare-earth elements."}, {"n": 59, "sym": "Pr", "name": "Praseodymium", "mass": "140.90766", "cat": "Lanthanide", "col": 6, "row": 9, "cfg": "[Xe]6s2 4f3", "en": 1.13, "radius": 239, "ie": 5.464, "ea": null, "ox": "+3", "state": "Solid", "melt": 1204, "boil": 3793, "density": 6.77, "block": "f", "period": 6, "group": "—", "year": "1885", "shells": [2, 8, 18, 21, 8, 2], "uses": "Strong magnets, aircraft engines, and yellow glass.", "fact": "Colors welder's goggles to block glare."}, {"n": 60, "sym": "Nd", "name": "Neodymium", "mass": "144.24", "cat": "Lanthanide", "col": 7, "row": 9, "cfg": "[Xe]6s2 4f4", "en": 1.14, "radius": 229, "ie": 5.525, "ea": null, "ox": "+3", "state": "Solid", "melt": 1294, "boil": 3347, "density": 7.01, "block": "f", "period": 6, "group": "—", "year": "1885", "shells": [2, 8, 18, 22, 8, 2], "uses": "The strongest permanent magnets (in headphones and motors).", "fact": "Neodymium magnets are in nearly every hard drive and earbud."}, {"n": 61, "sym": "Pm", "name": "Promethium", "mass": "144.91276", "cat": "Lanthanide", "col": 8, "row": 9, "cfg": "[Xe]6s2 4f5", "en": null, "radius": 236, "ie": 5.55, "ea": null, "ox": "+3", "state": "Solid", "melt": 1315, "boil": 3273, "density": 7.26, "block": "f", "period": 6, "group": "—", "year": "1945", "shells": [2, 8, 18, 23, 8, 2], "uses": "Luminous paint and tiny nuclear batteries.", "fact": "The only rare-earth that is radioactive with no stable form."}, {"n": 62, "sym": "Sm", "name": "Samarium", "mass": "150.4", "cat": "Lanthanide", "col": 9, "row": 9, "cfg": "[Xe]6s2 4f6", "en": 1.17, "radius": 229, "ie": 5.644, "ea": null, "ox": "+3, +2", "state": "Solid", "melt": 1347, "boil": 2067, "density": 7.52, "block": "f", "period": 6, "group": "—", "year": "1879", "shells": [2, 8, 18, 24, 8, 2], "uses": "High-temperature magnets and cancer treatment.", "fact": "Samarium-cobalt magnets work even when very hot."}, {"n": 63, "sym": "Eu", "name": "Europium", "mass": "151.964", "cat": "Lanthanide", "col": 10, "row": 9, "cfg": "[Xe]6s2 4f7", "en": null, "radius": 233, "ie": 5.67, "ea": null, "ox": "+3, +2", "state": "Solid", "melt": 1095, "boil": 1802, "density": 5.24, "block": "f", "period": 6, "group": "—", "year": "1901", "shells": [2, 8, 18, 25, 8, 2], "uses": "Red and blue phosphors in screens and anti-counterfeit ink.", "fact": "Makes euro banknotes glow under UV light to fight forgery."}, {"n": 64, "sym": "Gd", "name": "Gadolinium", "mass": "157.25", "cat": "Lanthanide", "col": 11, "row": 9, "cfg": "[Xe]6s2 4f7 5d1", "en": 1.2, "radius": 237, "ie": 6.15, "ea": null, "ox": "+3", "state": "Solid", "melt": 1586, "boil": 3546, "density": 7.9, "block": "f", "period": 6, "group": "—", "year": "1880", "shells": [2, 8, 18, 25, 9, 2], "uses": "MRI contrast agents and neutron shielding.", "fact": "Injected to make MRI scans clearer."}, {"n": 65, "sym": "Tb", "name": "Terbium", "mass": "158.92535", "cat": "Lanthanide", "col": 12, "row": 9, "cfg": "[Xe]6s2 4f9", "en": null, "radius": 221, "ie": 5.864, "ea": null, "ox": "+3", "state": "Solid", "melt": 1629, "boil": 3503, "density": 8.23, "block": "f", "period": 6, "group": "—", "year": "1843", "shells": [2, 8, 18, 27, 8, 2], "uses": "Green phosphors in displays and solid-state devices.", "fact": "Provides the green glow in fluorescent lamps and screens."}, {"n": 66, "sym": "Dy", "name": "Dysprosium", "mass": "162.500", "cat": "Lanthanide", "col": 13, "row": 9, "cfg": "[Xe]6s2 4f10", "en": 1.22, "radius": 229, "ie": 5.939, "ea": null, "ox": "+3", "state": "Solid", "melt": 1685, "boil": 2840, "density": 8.55, "block": "f", "period": 6, "group": "—", "year": "1886", "shells": [2, 8, 18, 28, 8, 2], "uses": "High-performance magnets and data storage.", "fact": "Helps magnets keep working at high temperatures in EV motors."}, {"n": 67, "sym": "Ho", "name": "Holmium", "mass": "164.93033", "cat": "Lanthanide", "col": 14, "row": 9, "cfg": "[Xe]6s2 4f11", "en": 1.23, "radius": 216, "ie": 6.022, "ea": null, "ox": "+3", "state": "Solid", "melt": 1747, "boil": 2973, "density": 8.8, "block": "f", "period": 6, "group": "—", "year": "1878", "shells": [2, 8, 18, 29, 8, 2], "uses": "The strongest magnetic fields and specialty lasers.", "fact": "Has the highest magnetic strength of any element."}, {"n": 68, "sym": "Er", "name": "Erbium", "mass": "167.26", "cat": "Lanthanide", "col": 15, "row": 9, "cfg": "[Xe]6s2 4f12", "en": 1.24, "radius": 235, "ie": 6.108, "ea": null, "ox": "+3", "state": "Solid", "melt": 1802, "boil": 3141, "density": 9.07, "block": "f", "period": 6, "group": "—", "year": "1843", "shells": [2, 8, 18, 30, 8, 2], "uses": "Fiber-optic amplifiers and pink glass/glazes.", "fact": "Boosts signals in the fiber cables that carry the internet."}, {"n": 69, "sym": "Tm", "name": "Thulium", "mass": "168.93422", "cat": "Lanthanide", "col": 16, "row": 9, "cfg": "[Xe]6s2 4f13", "en": 1.25, "radius": 227, "ie": 6.184, "ea": null, "ox": "+3", "state": "Solid", "melt": 1818, "boil": 2223, "density": 9.32, "block": "f", "period": 6, "group": "—", "year": "1879", "shells": [2, 8, 18, 31, 8, 2], "uses": "Portable X-ray sources and lasers.", "fact": "The rarest of the stable rare-earth elements."}, {"n": 70, "sym": "Yb", "name": "Ytterbium", "mass": "173.05", "cat": "Lanthanide", "col": 17, "row": 9, "cfg": "[Xe]6s2 4f14", "en": null, "radius": 242, "ie": 6.254, "ea": null, "ox": "+3, +2", "state": "Solid", "melt": 1092, "boil": 1469, "density": 6.9, "block": "f", "period": 6, "group": "—", "year": "1878", "shells": [2, 8, 18, 32, 8, 2], "uses": "Atomic clocks, lasers, and stress gauges.", "fact": "Used in some of the most precise atomic clocks ever built."}, {"n": 71, "sym": "Lu", "name": "Lutetium", "mass": "174.9667", "cat": "Lanthanide", "col": 18, "row": 9, "cfg": "[Xe]6s2 4f14 5d1", "en": 1.27, "radius": 221, "ie": 5.426, "ea": null, "ox": "+3", "state": "Solid", "melt": 1936, "boil": 3675, "density": 9.84, "block": "f", "period": 6, "group": "—", "year": "1907", "shells": [2, 8, 18, 32, 9, 2], "uses": "Petroleum refining catalysts and PET scan detectors.", "fact": "The heaviest and hardest rare-earth metal."}, {"n": 72, "sym": "Hf", "name": "Hafnium", "mass": "178.49", "cat": "Transition metal", "col": 4, "row": 6, "cfg": "[Xe]6s2 4f14 5d2", "en": 1.3, "radius": 212, "ie": 6.825, "ea": null, "ox": "+4", "state": "Solid", "melt": 2506, "boil": 4876, "density": 13.3, "block": "d", "period": 6, "group": 4, "year": "1923", "shells": [2, 8, 18, 32, 10, 2], "uses": "Nuclear reactor control rods and computer chips.", "fact": "Absorbs neutrons well, controlling nuclear reactions."}, {"n": 73, "sym": "Ta", "name": "Tantalum", "mass": "180.9479", "cat": "Transition metal", "col": 5, "row": 6, "cfg": "[Xe]6s2 4f14 5d3", "en": 1.5, "radius": 217, "ie": 7.89, "ea": 0.322, "ox": "+5", "state": "Solid", "melt": 3290, "boil": 5731, "density": 16.4, "block": "d", "period": 6, "group": 5, "year": "1802", "shells": [2, 8, 18, 32, 11, 2], "uses": "Capacitors in phones and laptops, and surgical implants.", "fact": "Body-friendly—used for implants that won't be rejected."}, {"n": 74, "sym": "W", "name": "Tungsten", "mass": "183.84", "cat": "Transition metal", "col": 6, "row": 6, "cfg": "[Xe]6s2 4f14 5d4", "en": 2.36, "radius": 210, "ie": 7.98, "ea": 0.815, "ox": "+6", "state": "Solid", "melt": 3695, "boil": 5828, "density": 19.3, "block": "d", "period": 6, "group": 6, "year": "1783", "shells": [2, 8, 18, 32, 12, 2], "uses": "Light-bulb filaments, drill bits, and armor.", "fact": "Has the highest melting point of all metals (3,422°C)."}, {"n": 75, "sym": "Re", "name": "Rhenium", "mass": "186.207", "cat": "Transition metal", "col": 7, "row": 6, "cfg": "[Xe]6s2 4f14 5d5", "en": 1.9, "radius": 217, "ie": 7.88, "ea": 0.15, "ox": "+7, +6, +4", "state": "Solid", "melt": 3459, "boil": 5869, "density": 20.8, "block": "d", "period": 6, "group": 7, "year": "1925", "shells": [2, 8, 18, 32, 13, 2], "uses": "Jet engine turbine blades and catalysts.", "fact": "One of the rarest elements; among the highest melting points."}, {"n": 76, "sym": "Os", "name": "Osmium", "mass": "190.2", "cat": "Transition metal", "col": 8, "row": 6, "cfg": "[Xe]6s2 4f14 5d6", "en": 2.2, "radius": 216, "ie": 8.7, "ea": 1.1, "ox": "+4, +3", "state": "Solid", "melt": 3306, "boil": 5285, "density": 22.57, "block": "d", "period": 6, "group": 8, "year": "1803", "shells": [2, 8, 18, 32, 14, 2], "uses": "Fountain-pen tips, electrical contacts, and hard alloys.", "fact": "The densest naturally occurring element."}, {"n": 77, "sym": "Ir", "name": "Iridium", "mass": "192.22", "cat": "Transition metal", "col": 9, "row": 6, "cfg": "[Xe]6s2 4f14 5d7", "en": 2.2, "radius": 202, "ie": 9.1, "ea": 1.565, "ox": "+4, +3", "state": "Solid", "melt": 2719, "boil": 4701, "density": 22.42, "block": "d", "period": 6, "group": 9, "year": "1803", "shells": [2, 8, 18, 32, 15, 2], "uses": "Spark plugs, pen tips, and crucibles.", "fact": "The most corrosion-resistant metal; linked to the dinosaur extinction layer."}, {"n": 78, "sym": "Pt", "name": "Platinum", "mass": "195.08", "cat": "Transition metal", "col": 10, "row": 6, "cfg": "[Xe]6s1 4f14 5d9", "en": 2.28, "radius": 209, "ie": 9, "ea": 2.128, "ox": "+4, +2", "state": "Solid", "melt": 2041.55, "boil": 4098, "density": 21.46, "block": "d", "period": 6, "group": 10, "year": "1735", "shells": [2, 8, 18, 32, 17, 1], "uses": "Catalytic converters, jewelry, and lab equipment.", "fact": "So rare that all the platinum ever mined would fit in a small room."}, {"n": 79, "sym": "Au", "name": "Gold", "mass": "196.96657", "cat": "Transition metal", "col": 11, "row": 6, "cfg": "[Xe]6s1 4f14 5d10", "en": 2.54, "radius": 166, "ie": 9.226, "ea": 2.309, "ox": "+3, +1", "state": "Solid", "melt": 1337.33, "boil": 3129, "density": 19.282, "block": "d", "period": 6, "group": 11, "year": "Ancient", "shells": [2, 8, 18, 32, 18, 1], "uses": "Jewelry, electronics, and a store of wealth.", "fact": "So unreactive it never tarnishes—ancient gold still shines."}, {"n": 80, "sym": "Hg", "name": "Mercury", "mass": "200.59", "cat": "Transition metal", "col": 12, "row": 6, "cfg": "[Xe]6s2 4f14 5d10", "en": 2, "radius": 209, "ie": 10.438, "ea": null, "ox": "+2, +1", "state": "Liquid", "melt": 234.32, "boil": 629.88, "density": 13.5336, "block": "d", "period": 6, "group": 12, "year": "Ancient", "shells": [2, 8, 18, 32, 18, 2], "uses": "Thermometers, fluorescent lamps, and (old) dental fillings.", "fact": "The only metal that is liquid at room temperature."}, {"n": 81, "sym": "Tl", "name": "Thallium", "mass": "204.383", "cat": "Post-transition metal", "col": 13, "row": 6, "cfg": "[Xe]6s2 4f14 5d10 6p1", "en": 1.62, "radius": 196, "ie": 6.108, "ea": 0.2, "ox": "+3, +1", "state": "Solid", "melt": 577, "boil": 1746, "density": 11.8, "block": "p", "period": 6, "group": 13, "year": "1861", "shells": [2, 8, 18, 32, 18, 3], "uses": "Electronics and (historically) rat poison.", "fact": "A tasteless, deadly poison once called 'the poisoner's poison'."}, {"n": 82, "sym": "Pb", "name": "Lead", "mass": "207", "cat": "Post-transition metal", "col": 14, "row": 6, "cfg": "[Xe]6s2 4f14 5d10 6p2", "en": 2.33, "radius": 202, "ie": 7.417, "ea": 0.36, "ox": "+4, +2", "state": "Solid", "melt": 600.61, "boil": 2022, "density": 11.342, "block": "p", "period": 6, "group": 14, "year": "Ancient", "shells": [2, 8, 18, 32, 18, 4], "uses": "Car batteries, radiation shielding, and (old) pipes/paint.", "fact": "Ancient Romans used lead pipes—'plumbing' comes from its Latin name."}, {"n": 83, "sym": "Bi", "name": "Bismuth", "mass": "208.98040", "cat": "Post-transition metal", "col": 15, "row": 6, "cfg": "[Xe]6s2 4f14 5d10 6p3", "en": 2.02, "radius": 207, "ie": 7.289, "ea": 0.946, "ox": "+5, +3", "state": "Solid", "melt": 544.55, "boil": 1837, "density": 9.807, "block": "p", "period": 6, "group": 15, "year": "1753", "shells": [2, 8, 18, 32, 18, 5], "uses": "Stomach medicine (Pepto-Bismol) and lead-free shot.", "fact": "Forms stunning rainbow-colored crystals."}, {"n": 84, "sym": "Po", "name": "Polonium", "mass": "208.98243", "cat": "Post-transition metal", "col": 16, "row": 6, "cfg": "[Xe]6s2 4f14 5d10 6p4", "en": 2, "radius": 197, "ie": 8.417, "ea": 1.9, "ox": "+4, +2", "state": "Solid", "melt": 527, "boil": 1235, "density": 9.32, "block": "p", "period": 6, "group": 16, "year": "1898", "shells": [2, 8, 18, 32, 18, 6], "uses": "Antistatic devices and heat sources for space probes.", "fact": "Intensely radioactive; famously used to poison a spy in 2006."}, {"n": 85, "sym": "At", "name": "Astatine", "mass": "209.98715", "cat": "Halogen", "col": 17, "row": 6, "cfg": "[Xe]6s2 4f14 5d10 6p5", "en": 2.2, "radius": 202, "ie": 9.5, "ea": 2.8, "ox": "+7, +5, +3, +1, -1", "state": "Solid", "melt": 575, "boil": null, "density": 7, "block": "p", "period": 6, "group": 17, "year": "1940", "shells": [2, 8, 18, 32, 18, 7], "uses": "Studied for targeted cancer radiotherapy.", "fact": "The rarest naturally occurring element—only grams exist on Earth."}, {"n": 86, "sym": "Rn", "name": "Radon", "mass": "222.01758", "cat": "Noble gas", "col": 18, "row": 6, "cfg": "[Xe]6s2 4f14 5d10 6p6", "en": null, "radius": 220, "ie": 10.745, "ea": null, "ox": "0", "state": "Gas", "melt": 202, "boil": 211.45, "density": 0.00973, "block": "p", "period": 6, "group": 18, "year": "1900", "shells": [2, 8, 18, 32, 18, 8], "uses": "Radon detectors monitor it as a health hazard.", "fact": "A radioactive gas that can seep into basements from the ground."}, {"n": 87, "sym": "Fr", "name": "Francium", "mass": "223.01973", "cat": "Alkali metal", "col": 1, "row": 7, "cfg": "[Rn]7s1", "en": 0.7, "radius": 348, "ie": 3.9, "ea": 0.47, "ox": "+1", "state": "Solid", "melt": 300, "boil": null, "density": null, "block": "s", "period": 7, "group": 1, "year": "1939", "shells": [2, 8, 18, 32, 18, 8, 1], "uses": "Only used in tiny amounts for research.", "fact": "The rarest naturally occurring element after astatine."}, {"n": 88, "sym": "Ra", "name": "Radium", "mass": "226.02541", "cat": "Alkaline earth", "col": 2, "row": 7, "cfg": "[Rn]7s2", "en": 0.9, "radius": 283, "ie": 5.279, "ea": null, "ox": "+2", "state": "Solid", "melt": 973, "boil": 1413, "density": 5, "block": "s", "period": 7, "group": 2, "year": "1898", "shells": [2, 8, 18, 32, 18, 8, 2], "uses": "Once used in glow-in-the-dark paint (now banned).", "fact": "Its glow once painted watch dials—until it made workers sick."}, {"n": 89, "sym": "Ac", "name": "Actinium", "mass": "227.02775", "cat": "Actinide", "col": 4, "row": 10, "cfg": "[Rn]7s2 6d1", "en": 1.1, "radius": 260, "ie": 5.17, "ea": null, "ox": "+3", "state": "Solid", "melt": 1324, "boil": 3471, "density": 10.07, "block": "f", "period": 7, "group": "—", "year": "1899", "shells": [2, 8, 18, 32, 18, 9, 2], "uses": "Targeted cancer therapy and neutron sources.", "fact": "Glows pale blue in the dark from its own radioactivity."}, {"n": 90, "sym": "Th", "name": "Thorium", "mass": "232.038", "cat": "Actinide", "col": 5, "row": 10, "cfg": "[Rn]7s2 6d2", "en": 1.3, "radius": 237, "ie": 6.08, "ea": null, "ox": "+4", "state": "Solid", "melt": 2023, "boil": 5061, "density": 11.72, "block": "f", "period": 7, "group": "—", "year": "1828", "shells": [2, 8, 18, 32, 18, 10, 2], "uses": "Potential nuclear fuel and old gas-lamp mantles.", "fact": "A possible cleaner, safer fuel for future nuclear reactors."}, {"n": 91, "sym": "Pa", "name": "Protactinium", "mass": "231.03588", "cat": "Actinide", "col": 6, "row": 10, "cfg": "[Rn]7s2 5f2 6d1", "en": 1.5, "radius": 243, "ie": 5.89, "ea": null, "ox": "+5, +4", "state": "Solid", "melt": 1845, "boil": null, "density": 15.37, "block": "f", "period": 7, "group": "—", "year": "1913", "shells": [2, 8, 18, 32, 20, 9, 2], "uses": "Used only in scientific research.", "fact": "One of the rarest and most expensive naturally occurring elements."}, {"n": 92, "sym": "U", "name": "Uranium", "mass": "238.0289", "cat": "Actinide", "col": 7, "row": 10, "cfg": "[Rn]7s2 5f3 6d1", "en": 1.38, "radius": 240, "ie": 6.194, "ea": null, "ox": "+6, +5, +4, +3", "state": "Solid", "melt": 1408, "boil": 4404, "density": 18.95, "block": "f", "period": 7, "group": "—", "year": "1789", "shells": [2, 8, 18, 32, 21, 9, 2], "uses": "Nuclear power plants and nuclear weapons.", "fact": "A single kilogram can release as much energy as tons of coal."}, {"n": 93, "sym": "Np", "name": "Neptunium", "mass": "237.048172", "cat": "Actinide", "col": 8, "row": 10, "cfg": "[Rn]7s2 5f4 6d1", "en": 1.36, "radius": 221, "ie": 6.266, "ea": null, "ox": "+6, +5, +4, +3", "state": "Solid", "melt": 917, "boil": 4175, "density": 20.25, "block": "f", "period": 7, "group": "—", "year": "1940", "shells": [2, 8, 18, 32, 22, 9, 2], "uses": "Neutron detection and research.", "fact": "The first synthetic transuranium element, made in 1940."}, {"n": 94, "sym": "Pu", "name": "Plutonium", "mass": "244.06420", "cat": "Actinide", "col": 9, "row": 10, "cfg": "[Rn]7s2 5f6", "en": 1.28, "radius": 243, "ie": 6.06, "ea": null, "ox": "+6, +5, +4, +3", "state": "Solid", "melt": 913, "boil": 3501, "density": 19.84, "block": "f", "period": 7, "group": "—", "year": "1940", "shells": [2, 8, 18, 32, 24, 8, 2], "uses": "Nuclear weapons and power for deep-space probes.", "fact": "Powers spacecraft like Voyager and the Mars rovers."}, {"n": 95, "sym": "Am", "name": "Americium", "mass": "243.061380", "cat": "Actinide", "col": 10, "row": 10, "cfg": "[Rn]7s2 5f7", "en": 1.3, "radius": 244, "ie": 5.993, "ea": null, "ox": "+6, +5, +4, +3", "state": "Solid", "melt": 1449, "boil": 2284, "density": 13.69, "block": "f", "period": 7, "group": "—", "year": "1944", "shells": [2, 8, 18, 32, 25, 8, 2], "uses": "Smoke detectors.", "fact": "There's a tiny bit of americium in most household smoke alarms."}, {"n": 96, "sym": "Cm", "name": "Curium", "mass": "247.07035", "cat": "Actinide", "col": 11, "row": 10, "cfg": "[Rn]7s2 5f7 6d1", "en": 1.3, "radius": 245, "ie": 6.02, "ea": null, "ox": "+3", "state": "Solid", "melt": 1618, "boil": 3400, "density": 13.51, "block": "f", "period": 7, "group": "—", "year": "1944", "shells": [2, 8, 18, 32, 25, 9, 2], "uses": "Power sources and research.", "fact": "Glows purple in the dark from intense radioactivity."}, {"n": 97, "sym": "Bk", "name": "Berkelium", "mass": "247.07031", "cat": "Actinide", "col": 12, "row": 10, "cfg": "[Rn]7s2 5f9", "en": 1.3, "radius": 244, "ie": 6.23, "ea": null, "ox": "+4, +3", "state": "Solid", "melt": 1323, "boil": null, "density": 14, "block": "f", "period": 7, "group": "—", "year": "1949", "shells": [2, 8, 18, 32, 27, 8, 2], "uses": "Used only for scientific research.", "fact": "Named after Berkeley, California, where it was created."}, {"n": 98, "sym": "Cf", "name": "Californium", "mass": "251.07959", "cat": "Actinide", "col": 13, "row": 10, "cfg": "[Rn]7s2 5f10", "en": 1.3, "radius": 245, "ie": 6.3, "ea": null, "ox": "+3", "state": "Solid", "melt": 1173, "boil": null, "density": null, "block": "f", "period": 7, "group": "—", "year": "1950", "shells": [2, 8, 18, 32, 28, 8, 2], "uses": "Neutron sources for oil wells and detecting explosives.", "fact": "A gram of it can cost tens of millions of dollars."}, {"n": 99, "sym": "Es", "name": "Einsteinium", "mass": "252.0830", "cat": "Actinide", "col": 14, "row": 10, "cfg": "[Rn]7s2 5f11", "en": 1.3, "radius": 245, "ie": 6.42, "ea": null, "ox": "+3", "state": "Solid", "melt": 1133, "boil": null, "density": null, "block": "f", "period": 7, "group": "—", "year": "1952", "shells": [2, 8, 18, 32, 29, 8, 2], "uses": "Research only; too rare for practical use.", "fact": "First discovered in the debris of a hydrogen bomb test."}, {"n": 100, "sym": "Fm", "name": "Fermium", "mass": "257.09511", "cat": "Actinide", "col": 15, "row": 10, "cfg": "[Rn] 5f12 7s2", "en": 1.3, "radius": null, "ie": 6.5, "ea": null, "ox": "+3", "state": "Solid", "melt": 1800, "boil": null, "density": null, "block": "f", "period": 7, "group": "—", "year": "1952", "shells": [2, 8, 18, 32, 30, 8, 2], "uses": "Pure research only.", "fact": "Cannot be made in weighable amounts—only atom by atom."}, {"n": 101, "sym": "Md", "name": "Mendelevium", "mass": "258.09843", "cat": "Actinide", "col": 16, "row": 10, "cfg": "[Rn]7s2 5f13", "en": 1.3, "radius": null, "ie": 6.58, "ea": null, "ox": "+3, +2", "state": "Solid", "melt": 1100, "boil": null, "density": null, "block": "f", "period": 7, "group": "—", "year": "1955", "shells": [2, 8, 18, 32, 31, 8, 2], "uses": "Studied only in research labs.", "fact": "Made one atom at a time; named after Mendeleev."}, {"n": 102, "sym": "No", "name": "Nobelium", "mass": "259.10100", "cat": "Actinide", "col": 17, "row": 10, "cfg": "[Rn]7s2 5f14", "en": 1.3, "radius": null, "ie": 6.65, "ea": null, "ox": "+3, +2", "state": "Solid", "melt": 1100, "boil": null, "density": null, "block": "f", "period": 7, "group": "—", "year": "1957", "shells": [2, 8, 18, 32, 32, 8, 2], "uses": "Research only.", "fact": "Named after Alfred Nobel of the Nobel Prizes."}, {"n": 103, "sym": "Lr", "name": "Lawrencium", "mass": "266.120", "cat": "Actinide", "col": 18, "row": 10, "cfg": "[Rn]7s2 5f14 6d1", "en": 1.3, "radius": null, "ie": null, "ea": null, "ox": "+3", "state": "Solid", "melt": 1900, "boil": null, "density": null, "block": "f", "period": 7, "group": "—", "year": "1961", "shells": [2, 8, 18, 32, 32, 9, 2], "uses": "Research only.", "fact": "The last of the actinide series."}, {"n": 104, "sym": "Rf", "name": "Rutherfordium", "mass": "267.122", "cat": "Transition metal", "col": 4, "row": 7, "cfg": "[Rn]7s2 5f14 6d2", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+4", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "d", "period": 7, "group": 4, "year": "1964", "shells": [2, 8, 18, 32, 32, 10, 2], "uses": "Research only; exists for seconds.", "fact": "The first 'transactinide' superheavy element."}, {"n": 105, "sym": "Db", "name": "Dubnium", "mass": "268.126", "cat": "Transition metal", "col": 5, "row": 7, "cfg": "[Rn]7s2 5f14 6d3", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+5, +4, +3", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "d", "period": 7, "group": 5, "year": "1967", "shells": [2, 8, 18, 32, 32, 11, 2], "uses": "Research only.", "fact": "Named after Dubna, Russia, a center of element discovery."}, {"n": 106, "sym": "Sg", "name": "Seaborgium", "mass": "269.128", "cat": "Transition metal", "col": 6, "row": 7, "cfg": "[Rn]7s2 5f14 6d4", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+6, +5, +4, +3, 0", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "d", "period": 7, "group": 6, "year": "1974", "shells": [2, 8, 18, 32, 32, 12, 2], "uses": "Research only.", "fact": "One of the few elements named after a living person (Glenn Seaborg)."}, {"n": 107, "sym": "Bh", "name": "Bohrium", "mass": "270.133", "cat": "Transition metal", "col": 7, "row": 7, "cfg": "[Rn]7s2 5f14 6d5", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+7, +5, +4, +3", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "d", "period": 7, "group": 7, "year": "1976", "shells": [2, 8, 18, 32, 32, 13, 2], "uses": "Research only.", "fact": "Named after physicist Niels Bohr."}, {"n": 108, "sym": "Hs", "name": "Hassium", "mass": "269.1336", "cat": "Transition metal", "col": 8, "row": 7, "cfg": "[Rn]7s2 5f14 6d6", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+8, +6, +5, +4, +3, +2", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "d", "period": 7, "group": 8, "year": "1984", "shells": [2, 8, 18, 32, 32, 14, 2], "uses": "Research only.", "fact": "Named after the German state of Hesse."}, {"n": 109, "sym": "Mt", "name": "Meitnerium", "mass": "277.154", "cat": "Unknown", "col": 9, "row": 7, "cfg": "[Rn]7s2 5f14 6d7", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+9, +8, +6, +4, +3, +1", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "d", "period": 7, "group": 9, "year": "1982", "shells": [2, 8, 18, 32, 32, 15, 2], "uses": "Research only.", "fact": "Named after physicist Lise Meitner."}, {"n": 110, "sym": "Ds", "name": "Darmstadtium", "mass": "282.166", "cat": "Unknown", "col": 10, "row": 7, "cfg": "[Rn]7s2 5f14 6d8", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+8, +6, +4, +2, 0", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "d", "period": 7, "group": 10, "year": "1994", "shells": [2, 8, 18, 32, 32, 16, 2], "uses": "Research only.", "fact": "Named after Darmstadt, Germany, where it was made."}, {"n": 111, "sym": "Rg", "name": "Roentgenium", "mass": "282.169", "cat": "Unknown", "col": 11, "row": 7, "cfg": "[Rn]7s2 5f14 6d9", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+5, +3, +1, -1", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "d", "period": 7, "group": 11, "year": "1994", "shells": [2, 8, 18, 32, 32, 17, 2], "uses": "Research only.", "fact": "Named after Wilhelm Röntgen, discoverer of X-rays."}, {"n": 112, "sym": "Cn", "name": "Copernicium", "mass": "286.179", "cat": "Transition metal", "col": 12, "row": 7, "cfg": "[Rn]7s2 5f14 6d10", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+2, +1, 0", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "d", "period": 7, "group": 12, "year": "1996", "shells": [2, 8, 18, 32, 32, 18, 2], "uses": "Research only.", "fact": "Named after astronomer Nicolaus Copernicus."}, {"n": 113, "sym": "Nh", "name": "Nihonium", "mass": "286.182", "cat": "Unknown", "col": 13, "row": 7, "cfg": "[Rn]5f14 6d10 7s2 7p1", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+3, +1", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "p", "period": 7, "group": 13, "year": "2004", "shells": [2, 8, 18, 32, 32, 18, 3], "uses": "Research only.", "fact": "The first element discovered in Asia (Japan)."}, {"n": 114, "sym": "Fl", "name": "Flerovium", "mass": "290.192", "cat": "Post-transition metal", "col": 14, "row": 7, "cfg": "[Rn]7s2 7p2 5f14 6d10", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+6, +4, +2, +1, 0", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "p", "period": 7, "group": 14, "year": "1998", "shells": [2, 8, 18, 32, 32, 18, 4], "uses": "Research only.", "fact": "Named after the Flerov Laboratory in Russia."}, {"n": 115, "sym": "Mc", "name": "Moscovium", "mass": "290.196", "cat": "Unknown", "col": 15, "row": 7, "cfg": "[Rn]7s2 7p3 5f14 6d10", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+3, +1", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "p", "period": 7, "group": 15, "year": "2003", "shells": [2, 8, 18, 32, 32, 18, 5], "uses": "Research only.", "fact": "Named after Moscow; only a few atoms have ever existed."}, {"n": 116, "sym": "Lv", "name": "Livermorium", "mass": "293.205", "cat": "Unknown", "col": 16, "row": 7, "cfg": "[Rn]7s2 7p4 5f14 6d10", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+4, +2, -2", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "p", "period": 7, "group": 16, "year": "2000", "shells": [2, 8, 18, 32, 32, 18, 6], "uses": "Research only.", "fact": "Named after Lawrence Livermore National Laboratory."}, {"n": 117, "sym": "Ts", "name": "Tennessine", "mass": "294.211", "cat": "Halogen", "col": 17, "row": 7, "cfg": "[Rn]7s2 7p5 5f14 6d10", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+5, +3, +1, -1", "state": "Solid", "melt": null, "boil": null, "density": null, "block": "p", "period": 7, "group": 17, "year": "2010", "shells": [2, 8, 18, 32, 32, 18, 7], "uses": "Research only.", "fact": "One of the newest elements, confirmed in 2010."}, {"n": 118, "sym": "Og", "name": "Oganesson", "mass": "295.216", "cat": "Noble gas", "col": 18, "row": 7, "cfg": "[Rn]7s2 7p6 5f14 6d10", "en": null, "radius": null, "ie": null, "ea": null, "ox": "+6, +4, +2, +1, 0, -1", "state": "Gas", "melt": null, "boil": null, "density": null, "block": "p", "period": 7, "group": 18, "year": "2006", "shells": [2, 8, 18, 32, 32, 18, 8], "uses": "Research only.", "fact": "The heaviest known element; named after living scientist Yuri Oganessian."}];</script>
+  <!-- ===== auth gate ===== -->
+  <div id="authGate">
+    <div id="authCard" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <div id="authTitle">Periodic Table</div>
+      <p class="authSub">Sign in to save your theme and picks across devices — or jump straight in as a guest.</p>
+      <div class="authTabs" role="tablist">
+        <button id="tabSignin" class="active" type="button" role="tab">Sign in</button>
+        <button id="tabSignup" type="button" role="tab">Sign up</button>
+      </div>
+      <form id="authForm" autocomplete="on" novalidate>
+        <label class="fld"><span>Email</span>
+          <input id="authEmail" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+        <label class="fld"><span>Password</span>
+          <input id="authPass" type="password" required minlength="6" autocomplete="current-password" placeholder="At least 6 characters"></label>
+        <div id="authErr" class="autherr" role="alert"></div>
+        <button id="authSubmit" class="authprimary" type="submit">Sign in</button>
+      </form>
+      <div class="authdiv"><span>or</span></div>
+      <button id="guestBtn" class="authghost" type="button">Continue as guest &rarr;</button>
+      <p id="authNote" class="authnote"></p>
+    </div>
+  </div>
+  <div id="acct" hidden>
+    <button id="acctBtn" type="button" title="Account" aria-haspopup="true"></button>
+    <div id="acctMenu"><div id="acctWho"></div><button id="signOutBtn" type="button">Sign out</button></div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script>
+  const reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  let tempK = 298;      // phase-at-temperature slider (kelvin)
+  let lastFocus = null; // element to restore focus to when the detail overlay closes
+  let THEME_NEBULA = [[80,120,255],[150,90,255],[40,180,200],[255,90,160]];
+  const CATEGORY_COLORS = {
+    "Nonmetal":"#4ade80","Noble gas":"#c084fc","Alkali metal":"#f87171","Alkaline earth":"#fb923c",
+    "Metalloid":"#2dd4bf","Halogen":"#facc15","Post-transition metal":"#38bdf8","Transition metal":"#60a5fa",
+    "Lanthanide":"#f472b6","Actinide":"#e879f9","Unknown":"#94a3b8"
+  };
+  const CAPTIONS = {
+    table:"Classic layout — rows are periods (energy levels), columns are groups (shared properties).",
+    sphere:"Every element on a globe — orbit it from outside, or step inside for a 360° view.",
+    sphereIn:"You're inside the sphere — drag to look around, click any element, then step back out.",
+    helix:"A spiral in atomic-number order — follow it to see periodic trends repeat as you climb.",
+    grid:"Elements split into their s / p / d / f blocks as depth layers — step through them below."
+  };
+
+  let camera, scene, renderer, controls;
+  const objects = [];
+  const cards = [];               // {el, data}
+  const targets = { table:[], sphere:[], sphereIn:[], helix:[], grid:[], sort:[] };
+  let sphereInside = false;
+  let sortAsc = false;   // sort direction: false = high→low
+  const fitDist = {};             // camera distance that frames each layout
+  let curLayout = "table";
+  let colorMode = "cat";
+  const gridBlocks = [];          // [{key,z,hw,hh,count,members}] one per s/p/d/f layer
+  let curGridLayer = 0;
+
+  const CARD_HALF = 70;           // half the diagonal footprint of a card, in scene units
+  // distance the camera needs so a layout's extent fits the current viewport
+  function computeFit(arr){
+    let hw=0,hh=0;
+    arr.forEach(o=>{ hw=Math.max(hw,Math.abs(o.position.x)); hh=Math.max(hh,Math.abs(o.position.y)); });
+    hw+=CARD_HALF; hh+=CARD_HALF;
+    const vFOV=THREE.MathUtils.degToRad(camera.fov)/2;
+    const asp=camera.aspect||1.6;
+    const zH=hh/Math.tan(vFOV);
+    const zW=(hw/asp)/Math.tan(vFOV);
+    return Math.max(zH,zW)*1.04;
+  }
+
+  /* ---------- colour helpers ---------- */
+  function lerpColor(a,b,t){
+    const ah=a.match(/\w\w/g).map(x=>parseInt(x,16));
+    const bh=b.match(/\w\w/g).map(x=>parseInt(x,16));
+    const r=Math.round(ah[0]+(bh[0]-ah[0])*t), g=Math.round(ah[1]+(bh[1]-ah[1])*t), bl=Math.round(ah[2]+(bh[2]-ah[2])*t);
+    return "#"+[r,g,bl].map(x=>x.toString(16).padStart(2,"0")).join("");
+  }
+  // blue -> cyan -> green -> yellow -> red heatmap
+  const HEAT=["1e3a8a","0891b2","16a34a","eab308","dc2626"];
+  function heat(t){ t=Math.max(0,Math.min(1,t)); const s=t*(HEAT.length-1); const i=Math.floor(s); if(i>=HEAT.length-1)return "#"+HEAT[HEAT.length-1]; return lerpColor(HEAT[i],HEAT[i+1],s-i); }
+
+  function propRange(key){
+    const vals=ELEMENTS.map(e=>e[key]).filter(v=>typeof v==="number");
+    return [Math.min(...vals),Math.max(...vals)];
+  }
+  const PHASE_COL={solid:"#8fd0ff",liquid:"#6ee7a8",gas:"#ff9d6b",none:"#4a4f5a"};
+  function phaseAt(e,T){
+    const m=(typeof e.melt==="number")?e.melt:null;
+    const b=(typeof e.boil==="number")?e.boil:null;
+    if(m===null&&b===null) return "none";
+    if(b!==null&&T>=b) return "gas";
+    if(m!==null&&T<m) return "solid";
+    if(m!==null) return "liquid";      // melt <= T < boil (boil may be unknown)
+    return "solid";                    // only boiling point known and T < boil
+  }
+  function colorFor(e){
+    if(colorMode==="cat") return CATEGORY_COLORS[e.cat]||CATEGORY_COLORS.Unknown;
+    if(colorMode==="phase") return PHASE_COL[phaseAt(e,tempK)];
+    const [lo,hi]=propRange(colorMode);
+    const v=e[colorMode];
+    if(typeof v!=="number") return "#3a3f4a";
+    return heat((v-lo)/(hi-lo||1));
+  }
+  function applyColors(){
+    cards.forEach(c=>c.el.style.setProperty("--c",colorFor(c.data)));
+    buildLegend();
+  }
+
+  /* ---------- legend ---------- */
+  function buildLegend(){
+    const rows=document.getElementById("legendRows");
+    const scale=document.getElementById("scalebar");
+    const ttl=document.getElementById("legendTitle");
+    if(colorMode==="phase"){
+      rows.style.display="none"; scale.style.display="none";
+      ttl.textContent="Phase — see temperature key above";
+      return;
+    }
+    if(colorMode==="cat"){
+      scale.style.display="none"; rows.style.display="flex"; rows.style.flexDirection="column"; rows.style.gap="4px";
+      ttl.textContent="Categories";
+      rows.innerHTML="";
+      Object.entries(CATEGORY_COLORS).forEach(([cat,color])=>{
+        const r=document.createElement("div"); r.className="row"; r.dataset.cat=cat;
+        r.innerHTML=`<span class="sw" style="background:${color};color:${color}"></span>${cat}`;
+        r.addEventListener("click",()=>toggleCategory(cat,r));
+        rows.appendChild(r);
+      });
+    } else {
+      rows.innerHTML=""; rows.style.display="none"; scale.style.display="flex";
+      const names={en:"Electronegativity",melt:"Melting point (K)",boil:"Boiling point (K)",radius:"Atomic radius (pm)",ie:"Ionization energy (eV)",ea:"Electron affinity (eV)",mass:"Atomic mass (u)",density:"Density (g/cm³)"};
+      ttl.textContent=names[colorMode]||"Scale";
+      const [lo,hi]=propRange(colorMode);
+      scale.querySelector(".grad").style.background=`linear-gradient(90deg,${HEAT.map(h=>"#"+h).join(",")})`;
+      document.getElementById("scaleMin").textContent=lo;
+      document.getElementById("scaleMax").textContent=hi;
+    }
+  }
+
+  /* ---------- build scene ---------- */
+  function init(){
+    ELEMENTS.forEach(e=>{ e.mass=+e.mass; });   // FIX: mass was a string → broke sort & colour-by
+    camera=new THREE.PerspectiveCamera(40,window.innerWidth/window.innerHeight,1,10000);
+    camera.position.z=3000;
+    scene=new THREE.Scene();
+
+    ELEMENTS.forEach(e=>{
+      const el=document.createElement("div");
+      el.className="element";
+      el.tabIndex=0; el.setAttribute("role","button");
+      el.setAttribute("aria-label",`${e.name}, symbol ${e.sym}, atomic number ${e.n}, ${e.cat}`);
+      el.dataset.n=e.n; el.title=e.name;
+      el.style.setProperty("--c",CATEGORY_COLORS[e.cat]||CATEGORY_COLORS.Unknown);
+      el.innerHTML=`<div class="catbar"></div><div class="wt">${e.block}</div><div class="number">${e.n}</div>
+        <div class="symbol">${e.sym}</div><div class="name">${e.name}</div><div class="mass">${(+e.mass).toFixed(2)}</div><div class="pval"></div>`;
+      el.addEventListener("click",ev=>{ev.stopPropagation();openDetail(e);});
+      el.addEventListener("keydown",ev=>{
+        if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); ev.stopPropagation(); openDetail(e); return; }
+        if(curLayout==="table" && !overlay.classList.contains("show")) handleCardArrow(ev,e);
+      });
+      const obj=new THREE.CSS3DObject(el);
+      obj.position.set(Math.random()*4000-2000,Math.random()*4000-2000,Math.random()*4000-2000);
+      scene.add(obj); objects.push(obj); cards.push({el,data:e});
+    });
+
+    // table — centred: columns 1..18 (mid 9.5), rows 1..10 (mid 5.75 incl. the f-block gap)
+    ELEMENTS.forEach(e=>{
+      const o=new THREE.Object3D();
+      o.position.x=(e.col-9.5)*132;
+      o.position.y=(5.75-e.row)*164;
+      targets.table.push(o);
+    });
+    const v=new THREE.Vector3(), n=objects.length;
+    for(let i=0;i<n;i++){ // sphere — outward-facing (viewed from outside)
+      const phi=Math.acos(-1+(2*i)/n), theta=Math.sqrt(n*Math.PI)*phi;
+      const o=new THREE.Object3D(); o.position.setFromSphericalCoords(820,phi,theta);
+      v.copy(o.position).multiplyScalar(2); o.lookAt(v); targets.sphere.push(o);
+      // same shell, but inward-facing (viewed from the centre — planetarium)
+      const oi=new THREE.Object3D(); oi.position.copy(o.position); oi.lookAt(0,0,0);
+      targets.sphereIn.push(oi);
+    }
+    for(let i=0;i<n;i++){ // helix
+      const theta=i*0.175+Math.PI, y=-(i*8)+450;
+      const o=new THREE.Object3D(); o.position.setFromCylindricalCoords(950,theta,y);
+      v.set(o.position.x*2,o.position.y,o.position.z*2); o.lookAt(v); targets.helix.push(o);
+    }
+    // grid — one flat centred sub-grid per block (s/p/d/f); gridFocus() brings one forward, hides the rest
+    const BLOCK_COLS={s:7,p:6,d:10,f:15}, BLOCK_ORDER=["s","p","d","f"];
+    for(let i=0;i<n;i++) targets.grid.push(new THREE.Object3D());
+    BLOCK_ORDER.forEach((bk)=>{
+      const members=[]; ELEMENTS.forEach((e,i)=>{ if(e.block===bk) members.push(i); });
+      const cols=BLOCK_COLS[bk], rows=Math.ceil(members.length/cols);
+      const sub=members.map((gi,j)=>({gi, x:((j%cols)-(cols-1)/2)*138, y:((rows-1)/2-Math.floor(j/cols))*168}));
+      gridBlocks.push({key:bk, members, sub, hw:(cols-1)/2*138+70, hh:(rows-1)/2*168+70, count:members.length});
+    });
+
+    renderer=new THREE.CSS3DRenderer();
+    const cont=document.getElementById("container");
+    renderer.setSize(cont.clientWidth,cont.clientHeight);
+    cont.appendChild(renderer.domElement);
+
+    controls=new THREE.OrbitControls(camera,renderer.domElement);
+    controls.enableDamping=true; controls.dampingFactor=0.09;
+    controls.rotateSpeed=0.55; controls.enableZoom=false;   // zoom is via buttons/slider/Ctrl only
+    controls.enablePan=false; controls.minDistance=350; controls.maxDistance=9000;
+    controls.target.set(0,0,0);
+
+    ["table","sphere","helix","grid"].forEach(name=>{
+      document.getElementById("btn-"+name).addEventListener("click",()=>setLayout(name));
+    });
+    // highlight multi-select dropdown
+    const hlBtn=document.getElementById("hlBtn"), hlMenu=document.getElementById("hlMenu");
+    hlBtn.addEventListener("click",ev=>{ ev.stopPropagation(); hlMenu.classList.toggle("open"); });
+    document.addEventListener("click",ev=>{ if(!document.getElementById("highlightDD").contains(ev.target)) hlMenu.classList.remove("open"); });
+    hlMenu.querySelectorAll("input[type=checkbox]").forEach(cb=>{
+      cb.addEventListener("change",()=>{ const set=filters[cb.dataset.group];
+        if(cb.checked) set.add(cb.dataset.k); else set.delete(cb.dataset.k); applyFilters(); });
+    });
+    document.getElementById("clearFilters").addEventListener("click",clearFilters);
+    buildGroupPeriodBars();
+    document.getElementById("colorby").addEventListener("change",e=>{ setColorMode(e.target.value); });
+    document.getElementById("sortby").addEventListener("change",e=>setSort(e.target.value));
+    document.getElementById("sortDir").addEventListener("click",()=>{
+      sortAsc=!sortAsc;
+      document.getElementById("sortDir").textContent=sortAsc?"▲ low→high":"▼ high→low";
+      const s=document.getElementById("sortby").value; if(s) setSort(s);
+    });
+    document.getElementById("search").addEventListener("input",e=>applySearch(e.target.value.trim().toLowerCase()));
+    // zoom controls
+    document.getElementById("zoomIn").addEventListener("click",()=>zoomBy(0.82));
+    document.getElementById("zoomOut").addEventListener("click",()=>zoomBy(1.22));
+    document.getElementById("resetView").addEventListener("click",resetView);
+    document.getElementById("zoomSlider").addEventListener("input",e=>setZoomFromSlider(+e.target.value));
+    renderer.domElement.addEventListener("wheel",e=>{
+      e.preventDefault();
+      if(e.ctrlKey||e.metaKey){ zoomBy(e.deltaY>0?1.1:0.9); return; } // Ctrl/⌘ + wheel = zoom
+      let dx=e.deltaX, dy=e.deltaY;                                   // trackpads give deltaX for sideways
+      if(e.shiftKey && !dx){ dx=e.deltaY; dy=0; }                     // Shift + wheel = sideways on a mouse
+      panScreen(dx*0.9, dy*0.9);                                      // scroll pans; view follows the scroll
+    },{passive:false});
+    window.addEventListener("keydown",e=>{
+      if((e.ctrlKey||e.metaKey)&&(e.key==="="||e.key==="+")){ e.preventDefault(); zoomBy(0.82); }
+      if((e.ctrlKey||e.metaKey)&&(e.key==="-"||e.key==="_")){ e.preventDefault(); zoomBy(1.22); }
+      // R = reset current view (ignore while typing or with modifier keys)
+      const typing=/^(INPUT|TEXTAREA|SELECT)$/.test((e.target&&e.target.tagName)||"");
+      if((e.key==="r"||e.key==="R") && !typing && !e.ctrlKey && !e.metaKey && !e.altKey){ resetView(); }
+    });
+
+    buildLayerNav();
+    document.getElementById("layPrev").addEventListener("click",()=>gridFocus((curGridLayer-1+gridBlocks.length)%gridBlocks.length));
+    document.getElementById("layNext").addEventListener("click",()=>gridFocus((curGridLayer+1)%gridBlocks.length));
+    document.getElementById("sphereToggle").addEventListener("click",()=>{ sphereInside?exitOutside():enterInside(); });
+    document.addEventListener("keydown",e=>{
+      if(curLayout!=="grid"||overlay.classList.contains("show"))return;
+      if(e.key==="ArrowRight"||e.key==="ArrowDown") gridFocus((curGridLayer+1)%gridBlocks.length);
+      if(e.key==="ArrowLeft"||e.key==="ArrowUp") gridFocus((curGridLayer-1+gridBlocks.length)%gridBlocks.length);
+    });
+
+    buildLegend();
+    setCaption("table");
+    layout();                                  // size viewport + compute fit distances
+    camera.position.set(0,0,fitDist.table);    // start framed on the table
+    controls.update();
+    transform(targets.table,1800,fitDist.table); // gentle fly-in from scattered start
+    syncZoomSlider();
+    window.addEventListener("resize",onResize);
+  }
+
+  // size the render area to the space *below* the header, and recompute fit distances
+  function layout(){
+    const cont=document.getElementById("container");
+    const headerBottom=document.getElementById("controls").getBoundingClientRect().bottom;
+    const top=Math.round(headerBottom+16);
+    cont.style.top=top+"px";
+    document.getElementById("groupBar").style.top=Math.round(headerBottom+6)+"px";
+    const pb=document.getElementById("periodBar"); pb.style.top=(top+6)+"px"; pb.style.bottom="70px";
+    const w=cont.clientWidth, h=cont.clientHeight;
+    renderer.setSize(w,h);
+    camera.aspect=w/h; camera.updateProjectionMatrix();
+    ["table","sphere","helix","grid"].forEach(nm=>fitDist[nm]=computeFit(targets[nm]));
+    render();
+  }
+
+  function placeInstant(arr){
+    for(let i=0;i<objects.length;i++){ objects[i].position.copy(arr[i].position); objects[i].rotation.copy(arr[i].rotation); }
+    render();
+  }
+
+  function setCaption(name){ document.getElementById("caption").textContent=CAPTIONS[name]; }
+
+  function setLayout(name){
+    document.querySelectorAll("#controls .bar button").forEach(b=>b.classList.remove("active"));
+    document.getElementById("btn-"+name).classList.add("active");
+    // leaving sort mode: restore normal card faces + clear its value labels/dims
+    document.body.classList.remove("sortmode");
+    document.getElementById("sortby").value="";
+    cards.forEach(c=>c.el.classList.remove("dim","match"));
+    if(anyFilter()) applyFilters();
+    curLayout=name;
+    setCaption(name);
+    const isGrid=(name==="grid"), isSphere=(name==="sphere");
+    document.getElementById("layernav").style.display=isGrid?"flex":"none";
+    document.getElementById("sphereToggle").style.display=isSphere?"block":"none";
+    if(!isGrid) cards.forEach(c=>c.el.classList.remove("layerdim","gridhide"));
+    // leaving sphere: always reset to the outside camera range
+    if(!isSphere){ sphereInside=false; controls.minDistance=350; controls.maxDistance=9000; }
+    if(isGrid){ gridFocus(curGridLayer,1500); }
+    else if(isSphere){ sphereInside=false; setSphereBtn(); controls.minDistance=350; controls.maxDistance=9000; transform(targets.sphere,1600,fitDist.sphere); }
+    else transform(targets[name],1600,fitDist[name]);
+    syncZoomSlider();
+  }
+
+  const BLOCK_LABEL={s:"s-block",p:"p-block",d:"d-block",f:"f-block"};
+  const BLOCK_DESC={s:"groups 1–2 + He",p:"groups 13–18",d:"transition metals",f:"lanth. + actinides"};
+  const BLOCK_COLOR={s:"#f87171",p:"#4ade80",d:"#60a5fa",f:"#f472b6"};
+  function buildLayerNav(){
+    const wrap=document.getElementById("layerBtns"); wrap.innerHTML="";
+    gridBlocks.forEach((b,k)=>{
+      const el=document.createElement("div");
+      el.className="lyr"; el.dataset.k=k; el.style.setProperty("--lc",BLOCK_COLOR[b.key]);
+      el.innerHTML=`<b>${BLOCK_LABEL[b.key]}</b><span>${b.count} · ${BLOCK_DESC[b.key]}</span>`;
+      el.addEventListener("click",()=>gridFocus(k));
+      wrap.appendChild(el);
+    });
+  }
+
+  function computeFitFor(hw,hh){
+    const vFOV=THREE.MathUtils.degToRad(camera.fov)/2, asp=camera.aspect||1.6;
+    return Math.max(hh/Math.tan(vFOV),(hw/asp)/Math.tan(vFOV))*1.06;
+  }
+  function tweenCamera(pz_target,tz_target,dur){
+    if(reduceMotion) dur=0;
+    if(dur<=0){ camera.position.set(0,0,pz_target); controls.target.set(0,0,tz_target); controls.update(); render(); return; }
+    new TWEEN.Tween(camera.position).to({x:0,y:0,z:pz_target},dur).easing(TWEEN.Easing.Cubic.InOut).start();
+    new TWEEN.Tween(controls.target).to({x:0,y:0,z:tz_target},dur).easing(TWEEN.Easing.Cubic.InOut).start();
+  }
+
+  /* ---------- zoom (buttons / slider / Ctrl only) ---------- */
+  function zoomBy(factor){
+    const dir=camera.position.clone().sub(controls.target);
+    let d=dir.length()*factor;
+    d=Math.min(controls.maxDistance,Math.max(controls.minDistance,d));
+    camera.position.copy(controls.target).add(dir.setLength(d));
+    controls.update(); syncZoomSlider(); render();
+  }
+  function setZoomFromSlider(v){   // v: 0 (far) … 100 (near)
+    const d=controls.maxDistance + (controls.minDistance-controls.maxDistance)*(v/100);
+    const dir=camera.position.clone().sub(controls.target).setLength(d);
+    camera.position.copy(controls.target).add(dir);
+    controls.update(); render();
+  }
+  function syncZoomSlider(){
+    const d=camera.position.distanceTo(controls.target);
+    const v=(controls.maxDistance-d)/(controls.maxDistance-controls.minDistance)*100;
+    const sl=document.getElementById("zoomSlider"); if(sl) sl.value=Math.max(0,Math.min(100,v));
+  }
+  // Reset ONLY the camera framing for the view you're currently in (table / sphere /
+  // helix / grid). Undoes panning, zooming and orbit, and re-frames the current
+  // arrangement to its initial position. Leaves theme, filters and sort untouched.
+  function resetView(){
+    controls.minDistance=350; controls.maxDistance=9000;
+    const sorting=document.body.classList.contains("sortmode");
+    if(!sorting && curLayout==="grid"){ gridFocus(0,900); syncZoomSlider(); return; }
+    if(!sorting && curLayout==="sphere"){
+      sphereInside=false; setSphereBtn();
+      transform(targets.sphere,900,fitDist.sphere); syncZoomSlider(); return;
+    }
+    const key=sorting?"sort":curLayout;
+    transform(targets[key]||targets.table,900,fitDist[key]||fitDist.table);
+    syncZoomSlider();
+  }
+  // pan the view by a screen-space delta (plain wheel/trackpad = scroll through the table)
+  function panScreen(dx,dy){
+    const dist=camera.position.distanceTo(controls.target);
+    const vFOV=THREE.MathUtils.degToRad(camera.fov);
+    const wpp=(2*Math.tan(vFOV/2)*dist)/renderer.domElement.clientHeight;
+    const right=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0);
+    const up=new THREE.Vector3().setFromMatrixColumn(camera.matrix,1);
+    const move=new THREE.Vector3()
+      .addScaledVector(right, dx*wpp)   // scroll right → view follows right
+      .addScaledVector(up,    dy*wpp);  // scroll down  → view follows down
+    camera.position.add(move); controls.target.add(move); controls.update(); render();
+  }
+  function gridFocus(k,dur=850){
+    curGridLayer=k;
+    // focused block: flat grid facing camera at z=0; every other block: parked far behind & hidden
+    for(let bi=0; bi<gridBlocks.length; bi++){
+      const b=gridBlocks[bi], focused=(bi===k), z=focused?0:-3000;
+      b.sub.forEach(s=>{
+        const o=targets.grid[s.gi];
+        o.position.set(s.x, focused? s.y : s.y*0.15, z);
+        o.rotation.set(0,0,0);
+      });
+    }
+    const focus=new Set(gridBlocks[k].members);
+    cards.forEach((c,i)=>{ c.el.classList.toggle("gridhide",!focus.has(i)); c.el.classList.remove("layerdim"); });
+    transform(targets.grid,dur);                       // animate cards to new positions (camera handled below)
+    tweenCamera(computeFitFor(gridBlocks[k].hw,gridBlocks[k].hh),0,dur);
+    document.querySelectorAll("#layernav .lyr").forEach(btn=>btn.classList.toggle("active",+btn.dataset.k===k));
+    const b=gridBlocks[k];
+    document.getElementById("caption").textContent=`${BLOCK_LABEL[b.key]} — ${b.count} elements (${BLOCK_DESC[b.key]}). Use ‹ › or ↑↓ to switch blocks.`;
+    render();
+  }
+
+  // ---- combinable filters (metal type · state · block · group · period) ----
+  const filters={type:new Set(),state:new Set(),block:new Set(),group:new Set(),period:new Set()};
+  function elemType(e){ return e.cat==="Metalloid" ? "Metalloid"
+      : (e.cat==="Nonmetal"||e.cat==="Noble gas"||e.cat==="Halogen") ? "Nonmetal" : "Metal"; }
+  function elemState(e){ const s=e.state||""; return /Gas/.test(s)?"Gas":/Liquid/.test(s)?"Liquid":/Solid/.test(s)?"Solid":""; }
+  function elemGroup(e){ return e.block==="f" ? 3 : e.group; }   // lanthanides + actinides sit under group 3
+  function anyFilter(){ return filters.type.size||filters.state.size||filters.block.size||filters.group.size||filters.period.size; }
+  function applyFilters(){
+    activeCat=null; document.querySelectorAll("#legendRows .row").forEach(r=>r.classList.remove("off"));
+    const on=anyFilter();
+    cards.forEach(c=>{
+      const e=c.data;
+      const m = (filters.type.size?filters.type.has(elemType(e)):true)
+             && (filters.state.size?filters.state.has(elemState(e)):true)
+             && (filters.block.size?filters.block.has(e.block):true)
+             && (filters.group.size?filters.group.has(String(elemGroup(e))):true)
+             && (filters.period.size?filters.period.has(String(e.period)):true);
+      c.el.classList.toggle("dim",on && !m);
+      c.el.classList.toggle("match",on && m);
+    });
+    updateHlCount();
+    render();
+  }
+  function updateHlCount(){
+    const n=filters.type.size+filters.state.size+filters.block.size;
+    document.getElementById("hlCount").textContent=n?`(${n})`:"";
+    document.getElementById("hlBtn").classList.toggle("on",n>0);
+  }
+  function clearFilters(){
+    Object.values(filters).forEach(s=>s.clear());
+    document.querySelectorAll("#hlMenu input[type=checkbox]").forEach(cb=>cb.checked=false);
+    document.querySelectorAll("#groupBar .gp,#periodBar .gp").forEach(b=>b.classList.remove("active"));
+    cards.forEach(c=>c.el.classList.remove("dim","match"));
+    updateHlCount(); render();
+  }
+  // group (top) + period (side) selector strips
+  function buildGroupPeriodBars(){
+    const gb=document.getElementById("groupBar"), pb=document.getElementById("periodBar");
+    gb.style.display="flex"; pb.style.display="flex";
+    gb.innerHTML='<span class="gplbl">GRP</span>';
+    for(let g=1; g<=18; g++){ const b=document.createElement("button"); b.className="gp"; b.textContent=g;
+      b.addEventListener("click",()=>toggleGP("group",String(g),b)); gb.appendChild(b); }
+    const gr=document.createElement("button"); gr.className="gp gpreset"; gr.textContent="↺"; gr.title="Reset groups";
+    gr.addEventListener("click",()=>resetGP("group")); gb.appendChild(gr);
+    pb.innerHTML='<span class="gplbl">PER</span>';
+    for(let p=1; p<=7; p++){ const b=document.createElement("button"); b.className="gp"; b.textContent=p;
+      b.addEventListener("click",()=>toggleGP("period",String(p),b)); pb.appendChild(b); }
+    const pr=document.createElement("button"); pr.className="gp gpreset"; pr.textContent="↺"; pr.title="Reset periods";
+    pr.addEventListener("click",()=>resetGP("period")); pb.appendChild(pr);
+  }
+  function toggleGP(kind,val,btn){
+    const set=filters[kind];
+    if(set.has(val)){ set.delete(val); btn.classList.remove("active"); }
+    else { set.add(val); btn.classList.add("active"); }
+    applyFilters();
+  }
+  function resetGP(kind){
+    filters[kind].clear();
+    const bar=kind==="group"?"#groupBar":"#periodBar";
+    document.querySelectorAll(bar+" .gp").forEach(b=>b.classList.remove("active"));
+    applyFilters();
+  }
+
+  function applySearch(q){
+    activeCat=null; document.querySelectorAll("#legendRows .row").forEach(r=>r.classList.remove("off"));
+    if(!q){ anyFilter()?applyFilters():cards.forEach(c=>c.el.classList.remove("dim","match")); render(); return; }
+    cards.forEach(c=>{
+      const e=c.data;
+      const hit=e.name.toLowerCase().startsWith(q)||e.sym.toLowerCase()===q||e.sym.toLowerCase().startsWith(q)||String(e.n)===q;
+      c.el.classList.toggle("dim",!hit);
+      c.el.classList.toggle("match",hit);
+    });
+    render();
+  }
+
+  // click a legend swatch to isolate that category (direct legend ↔ element link)
+  let activeCat=null;
+  function toggleCategory(cat){
+    const rows=document.querySelectorAll("#legendRows .row");
+    if(activeCat===cat){
+      activeCat=null; rows.forEach(r=>r.classList.remove("off"));
+      cards.forEach(c=>c.el.classList.remove("dim","match")); render(); return;
+    }
+    activeCat=cat;
+    rows.forEach(r=>r.classList.toggle("off",r.dataset.cat!==cat));
+    cards.forEach(c=>{ const on=c.data.cat===cat; c.el.classList.toggle("dim",!on); c.el.classList.toggle("match",on); });
+    render();
+  }
+
+  /* ---------- sphere: inside (planetarium) vs outside ---------- */
+  function setSphereBtn(){ document.getElementById("sphereToggle").textContent = sphereInside ? "↩  Step back outside" : "⦿  Step inside the sphere"; }
+  function enterInside(){
+    sphereInside=true; setSphereBtn(); setCaption("sphereIn");
+    controls.minDistance=15; controls.maxDistance=9000;      // stay open during the flight
+    transform(targets.sphereIn,1500);                        // flip cards to face the centre
+    new TWEEN.Tween(camera.position).to({x:0,y:0,z:60},1700).easing(TWEEN.Easing.Cubic.InOut)
+      .onComplete(()=>{ controls.maxDistance=760; }).start(); // glide straight into the core
+    new TWEEN.Tween(controls.target).to({x:0,y:0,z:0},1700).easing(TWEEN.Easing.Cubic.InOut).start();
+  }
+  function exitOutside(){
+    sphereInside=false; setSphereBtn(); setCaption("sphere");
+    controls.minDistance=15; controls.maxDistance=9000;      // low min so the fly-out doesn't clamp
+    transform(targets.sphere,1500,fitDist.sphere);           // flip outward + fly back out
+    setTimeout(()=>{ if(!sphereInside) controls.minDistance=350; },1750);
+  }
+
+  /* ---------- sort / rank by a property (highest → lowest) ---------- */
+  const SORT_META={
+    en:{name:"Electronegativity",unit:"",fix:2},
+    melt:{name:"Melting point",unit:" K",fix:0},
+    boil:{name:"Boiling point",unit:" K",fix:0},
+    radius:{name:"Atomic radius",unit:" pm",fix:0},
+    ie:{name:"Ionization energy",unit:" eV",fix:2},
+    ea:{name:"Electron affinity",unit:" eV",fix:2},
+    mass:{name:"Atomic mass",unit:" u",fix:1},
+    density:{name:"Density",unit:" g/cm³",fix:2}
+  };
+  function setSort(prop){
+    if(!prop){ if(curLayout==="sort") setLayout("table"); return; }
+    curLayout="sort";
+    document.querySelectorAll("#controls .bar button").forEach(b=>b.classList.remove("active"));
+    document.getElementById("layernav").style.display="none";
+    document.getElementById("sphereToggle").style.display="none";
+    sphereInside=false; controls.minDistance=350; controls.maxDistance=9000;
+    cards.forEach(c=>c.el.classList.remove("layerdim"));
+    colorMode=prop; document.getElementById("colorby").value=prop; document.getElementById("tempBar").classList.remove("show"); applyColors();
+    buildSortTargets(prop);
+    document.body.classList.add("sortmode");
+    const meta=SORT_META[prop];
+    const flow=sortAsc?"lowest (top-left) → highest":"highest (top-left) → lowest";
+    document.getElementById("caption").textContent=`Ranked by ${meta.name} — ${flow}. Colour follows the same scale; grey cards have no data. Toggle ▲/▼ to flip.`;
+    transform(targets.sort,1600,fitDist.sort);
+  }
+  function buildSortTargets(prop){
+    const meta=SORT_META[prop];
+    const withVal=[], without=[];
+    ELEMENTS.forEach((e,i)=>{ (typeof e[prop]==="number"?withVal:without).push(i); });
+    withVal.sort((a,b)=> sortAsc ? ELEMENTS[a][prop]-ELEMENTS[b][prop] : ELEMENTS[b][prop]-ELEMENTS[a][prop]);
+    const order=withVal.concat(without);
+    const cols=15, rows=Math.ceil(order.length/cols);
+    targets.sort.length=0; for(let i=0;i<ELEMENTS.length;i++) targets.sort.push(new THREE.Object3D());
+    order.forEach((gi,r)=>{
+      targets.sort[gi].position.set(((r%cols)-(cols-1)/2)*138, ((rows-1)/2-Math.floor(r/cols))*168, 0);
+    });
+    fitDist.sort=computeFitFor((cols-1)/2*138+70,(rows-1)/2*168+70);
+    cards.forEach((c,i)=>{
+      const v=ELEMENTS[i][prop], pv=c.el.querySelector(".pval");
+      if(typeof v==="number"){ pv.textContent=(+v).toFixed(meta.fix)+meta.unit; c.el.classList.remove("dim"); }
+      else { pv.textContent="—"; c.el.classList.add("dim"); }
+      c.el.classList.remove("match");
+    });
+  }
+
+  function transform(arr,dur,camZ){
+    TWEEN.removeAll();
+    if(reduceMotion){
+      placeInstant(arr);
+      if(typeof camZ==="number"){
+        const dir=camera.position.clone().sub(controls.target).normalize();
+        camera.position.copy(dir.multiplyScalar(camZ)); controls.target.set(0,0,0); controls.update();
+      }
+      render(); return;
+    }
+    for(let i=0;i<objects.length;i++){
+      const o=objects[i], t=arr[i];
+      const d=dur*(0.92+Math.random()*0.16);   // tight, consistent stagger (cleaner)
+      new TWEEN.Tween(o.position).to({x:t.position.x,y:t.position.y,z:t.position.z},d).easing(TWEEN.Easing.Cubic.InOut).start();
+      new TWEEN.Tween(o.rotation).to({x:t.rotation.x,y:t.rotation.y,z:t.rotation.z},d).easing(TWEEN.Easing.Cubic.InOut).start();
+    }
+    // glide the camera straight back to frame the new layout, re-centering it
+    if(typeof camZ==="number"){
+      const dir=camera.position.clone().sub(controls.target).normalize();
+      const end=dir.multiplyScalar(camZ);
+      new TWEEN.Tween(camera.position).to({x:end.x,y:end.y,z:end.z},dur*1.1)
+        .easing(TWEEN.Easing.Cubic.InOut).start();
+      new TWEEN.Tween(controls.target).to({x:0,y:0,z:0},dur*1.1).easing(TWEEN.Easing.Cubic.InOut).start();
+    }
+  }
+
+  function onResize(){
+    layout();
+    if(curLayout==="grid"){
+      gridFocus(curGridLayer,0);              // re-fit the focused block layer
+    } else if(curLayout==="sphere" && sphereInside){
+      controls.update();                      // stay inside; nothing to reframe
+    } else if(curLayout==="sort"){
+      const s=document.getElementById("sortby").value; if(s) buildSortTargets(s);
+      camera.position.set(0,0,fitDist.sort); controls.target.set(0,0,0); controls.update();
+    } else {
+      const dir=camera.position.clone().sub(controls.target).normalize();
+      camera.position.copy(dir.multiplyScalar(fitDist[curLayout]));
+      controls.update();
+    }
+    if(bohr.renderer) sizeBohr();
+    if(shapes.renderer) sizeShapes();
+    syncZoomSlider();
+  }
+  function animate(){ requestAnimationFrame(animate); if(document.hidden) return; TWEEN.update(); controls.update(); render(); if(bohr.active) renderBohr(); if(shapes.active) renderShapes(); }
+  function render(){ renderer.render(scene,camera); }
+
+  /* ================= DETAIL OVERLAY ================= */
+  const overlay=document.getElementById("overlay");
+  document.getElementById("close").addEventListener("click",closeDetail);
+  overlay.addEventListener("click",e=>{ if(e.target===overlay) closeDetail(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeDetail(); });
+  document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.t)));
+
+  function switchTab(t){
+    document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("active",b.dataset.t===t));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    document.getElementById("panel-"+t).classList.add("active");
+    bohr.active=(t==="bohr");
+    shapes.active=(t==="shapes");
+    if(t==="bohr") sizeBohr();
+    if(t==="shapes"){ if(current) buildShapes(current); sizeShapes(); }
+  }
+
+  function fmtK(k){ return (typeof k==="number")? `${k} K  (${(k-273.15).toFixed(0)}°C)` : "—"; }
+  function val(x,u){ return (x===null||x===undefined||x==="")? "—" : x+(u||""); }
+
+  let current=null;
+  function openDetail(e){
+    lastFocus=document.activeElement;
+    current=e;
+    const c=colorFor(e);
+    document.getElementById("card").style.setProperty("--c",c);
+    document.getElementById("dSym").textContent=e.sym;
+    document.getElementById("dName").textContent=e.name;
+    document.getElementById("dSub").textContent=`#${e.n} · ${(+e.mass).toFixed(3)} u · ${e.state||"—"}`;
+    document.getElementById("dBadge").textContent=e.cat;
+    buildOrbital(e);
+    buildData(e);
+    overlay.classList.add("show");
+    switchTab("bohr");
+    buildBohr(e);
+    const idx=ELEMENTS.findIndex(x=>x.n===e.n);
+    const pe=document.getElementById("prevEl"), nx=document.getElementById("nextEl");
+    if(pe) pe.disabled=idx<=0;
+    if(nx) nx.disabled=idx>=ELEMENTS.length-1;
+    updateHash();
+    const cb=document.getElementById("close"); if(cb) cb.focus();
+  }
+  function closeDetail(){
+    overlay.classList.remove("show"); bohr.active=false; shapes.active=false;
+    if(location.hash) history.replaceState(null,"",location.pathname+location.search);
+    const el=lastFocus||document.getElementById("search");
+    if(el && el.focus){ try{ el.focus(); }catch(_){} }
+  }
+
+  /* ---------- Bohr 3D atom (WebGL) ---------- */
+  const bohr={renderer:null,scene:null,camera:null,controls:null,active:false,group:null,shells:[],paused:false,mode:"3d"};
+  document.getElementById("bohrPause").addEventListener("click",()=>{
+    bohr.paused=!bohr.paused;
+    document.getElementById("bohrPause").textContent=bohr.paused?"▶":"⏸";
+    if(!bohr.paused && bohr.mode==="3d" && bohr.controls) bohr.controls.autoRotate=true;
+  });
+  document.getElementById("bohrMode").addEventListener("click",()=>{
+    bohr.mode = bohr.mode==="3d" ? "2d" : "3d";
+    document.getElementById("bohrMode").textContent = bohr.mode==="3d" ? "3D" : "2D";
+    if(current) buildBohr(current);
+  });
+  function initBohr(){
+    const canvas=document.getElementById("bohrCanvas");
+    bohr.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+    bohr.scene=new THREE.Scene();
+    bohr.camera=new THREE.PerspectiveCamera(45,1,0.1,1000);
+    bohr.camera.position.set(0,6,26);
+    bohr.camera.lookAt(0,0,0);
+    const l1=new THREE.PointLight(0xffffff,1.1); l1.position.set(15,20,25); bohr.scene.add(l1);
+    bohr.scene.add(new THREE.AmbientLight(0x8899bb,0.7));
+    // cursor-driven: drag to rotate from any angle, scroll to zoom
+    bohr.controls=new THREE.OrbitControls(bohr.camera,canvas);
+    bohr.controls.enableDamping=true; bohr.controls.dampingFactor=0.1;
+    bohr.controls.enablePan=false; bohr.controls.rotateSpeed=0.6; bohr.controls.zoomSpeed=0.7;
+    bohr.controls.minDistance=10; bohr.controls.maxDistance=70;
+    bohr.controls.autoRotate=!reduceMotion; bohr.controls.autoRotateSpeed=1.6;
+    bohr.controls.addEventListener("start",()=>{ bohr.controls.autoRotate=false; }); // pause spin when grabbed
+  }
+  function sizeBohr(){
+    if(!bohr.renderer) return;
+    const wrap=document.getElementById("bohrWrap");
+    const w=wrap.clientWidth,h=wrap.clientHeight;
+    bohr.renderer.setPixelRatio(window.devicePixelRatio);
+    bohr.renderer.setSize(w,h,false);
+    bohr.camera.aspect=w/h; bohr.camera.updateProjectionMatrix();
+  }
+  function buildBohr(e){
+    if(!bohr.renderer) initBohr();
+    const col=new THREE.Color(colorFor(e));
+    while(bohr.scene.children.filter(o=>o.userData.dyn).length){
+      const o=bohr.scene.children.find(x=>x.userData.dyn); disposeObj(o); bohr.scene.remove(o);
+    }
+    bohr.shells=[];
+    const g=new THREE.Group(); g.userData.dyn=true; bohr.group=g; bohr.scene.add(g);
+
+    const shells=e.shells;
+    const ns=shells.length;
+    // normalise: everything fits inside a fixed outer radius, whatever the shell count
+    const OUTER=11, nucR=Math.min(1.8,1.0+ns*0.12);
+    const innerR=nucR+2.2;
+    const step=ns>1?(OUTER-innerR)/(ns-1):0;
+    const shellR=si=>innerR+si*step;
+    const eSize=Math.max(0.22,0.5-ns*0.03);
+
+    // nucleus + soft glow halo
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(nucR,40,40),
+      new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.65,roughness:.3,metalness:.1})));
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(nucR*1.5,28,28),
+      new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.14})));
+
+    const is2D=(bohr.mode==="2d");
+    shells.forEach((count,si)=>{
+      const r=shellR(si), tilt=is2D?0:si*0.22;
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(r,is2D?0.03:0.018,8,120),
+        new THREE.MeshBasicMaterial({color:0x9fb6d6,transparent:true,opacity:is2D?0.45:0.30}));
+      ring.rotation.x = is2D ? 0 : (Math.PI/2 + tilt);   // 2D: rings lie flat in the screen plane
+      g.add(ring);
+      const eg=new THREE.Group(); if(!is2D) eg.rotation.x=tilt;
+      for(let k=0;k<count;k++){
+        const a=(k/count)*Math.PI*2;
+        const em=new THREE.Mesh(new THREE.SphereGeometry(eSize,18,18),
+          new THREE.MeshStandardMaterial({color:0xbfefff,emissive:0x33aadd,emissiveIntensity:.9,roughness:.4}));
+        if(is2D) em.position.set(Math.cos(a)*r,Math.sin(a)*r,0);
+        else     em.position.set(Math.cos(a)*r,0,Math.sin(a)*r);
+        eg.add(em);
+      }
+      g.add(eg);
+      bohr.shells.push({grp:eg,speed:0.5/(si+1)+0.12,axis:is2D?"z":"y"});
+    });
+    // camera + controls per mode
+    if(is2D){
+      bohr.camera.position.set(0,0,OUTER*2.7);
+      if(bohr.controls){ bohr.controls.target.set(0,0,0); bohr.controls.enableRotate=false; bohr.controls.autoRotate=false; bohr.controls.update(); }
+    } else {
+      bohr.camera.position.set(0,OUTER*0.32,OUTER*2.35);
+      if(bohr.controls){ bohr.controls.target.set(0,0,0); bohr.controls.enableRotate=true; bohr.controls.autoRotate=!bohr.paused&&!reduceMotion; bohr.controls.update(); }
+      else bohr.camera.lookAt(0,0,0);
+    }
+
+    const protons=e.n, neutrons=Math.max(0,Math.round(+e.mass)-e.n);
+    document.getElementById("bohrInfo").innerHTML=
+      `<b>Nucleus:</b> ${protons} protons, ${neutrons} neutrons<br>`+
+      `<b>Electron shells:</b> ${shells.join(" · ")}<br>`+
+      `<span style="opacity:.6">${is2D?"Flat 2D shell diagram · scroll to zoom.":"Drag to rotate · scroll to zoom · auto-spins until grabbed."}</span>`;
+    sizeBohr();
+  }
+  function renderBohr(){
+    if(!bohr.renderer||!bohr.group) return;
+    if(!bohr.paused && !reduceMotion) bohr.shells.forEach(s=>{ s.grp.rotation[s.axis]+=s.speed*0.03; }); // electrons orbit
+    if(bohr.controls){ if(bohr.paused) bohr.controls.autoRotate=false; bohr.controls.update(); }
+    bohr.renderer.render(bohr.scene,bohr.camera);
+  }
+
+  /* ---------- Orbital shapes 3D (s / p / d / f lobes) ---------- */
+  const shapes={renderer:null,scene:null,camera:null,controls:null,active:false,group:null,forEl:null};
+  const ORB_COLORS={s:"#5ab0ff",px:"#ff6b6b",py:"#4ade80",pz:"#facc15",d:"#c084fc",f:"#fb923c"};
+  function initShapes(){
+    const canvas=document.getElementById("shapesCanvas");
+    shapes.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+    shapes.scene=new THREE.Scene();
+    shapes.camera=new THREE.PerspectiveCamera(45,1,0.1,1000);
+    shapes.camera.position.set(0,7,34);
+    const l=new THREE.PointLight(0xffffff,1.1); l.position.set(20,25,30); shapes.scene.add(l);
+    shapes.scene.add(new THREE.AmbientLight(0x99aacc,0.75));
+    shapes.controls=new THREE.OrbitControls(shapes.camera,canvas);
+    shapes.controls.enableDamping=true; shapes.controls.dampingFactor=0.1;
+    shapes.controls.enablePan=false; shapes.controls.rotateSpeed=0.6;
+    shapes.controls.minDistance=14; shapes.controls.maxDistance=90;
+    shapes.controls.autoRotate=!reduceMotion; shapes.controls.autoRotateSpeed=1.3;
+  }
+  function sizeShapes(){
+    if(!shapes.renderer) return;
+    const wrap=document.getElementById("shapesWrap"), w=wrap.clientWidth,h=wrap.clientHeight;
+    shapes.renderer.setPixelRatio(window.devicePixelRatio);
+    shapes.renderer.setSize(w,h,false);
+    shapes.camera.aspect=w/h; shapes.camera.updateProjectionMatrix();
+  }
+  // one dumbbell lobe pair along an axis
+  function lobePair(color,axis,scale){
+    const g=new THREE.Group();
+    const mat=new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.25,transparent:true,opacity:.85,roughness:.4});
+    [1,-1].forEach(s=>{
+      const m=new THREE.Mesh(new THREE.SphereGeometry(1,24,24),mat);
+      m.scale.set(scale.x,scale.y,scale.z);
+      m.position[axis]=s*scale[axis]*0.9;
+      g.add(m);
+    });
+    return g;
+  }
+  function makeS(color){ const mat=new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.25,transparent:true,opacity:.7,roughness:.4});
+    return new THREE.Mesh(new THREE.SphereGeometry(2.4,32,32),mat); }
+  function makeP(){ // px, py, pz dumbbells together
+    const g=new THREE.Group();
+    g.add(lobePair(ORB_COLORS.px,"x",{x:2.6,y:1.1,z:1.1}));
+    g.add(lobePair(ORB_COLORS.py,"y",{x:1.1,y:2.6,z:1.1}));
+    g.add(lobePair(ORB_COLORS.pz,"z",{x:1.1,y:1.1,z:2.6}));
+    return g;
+  }
+  function cloverleaf(color,rotZ){ // 4-lobe d orbital in a plane
+    const g=new THREE.Group();
+    const mat=new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.22,transparent:true,opacity:.8,roughness:.45});
+    for(let i=0;i<4;i++){
+      const a=Math.PI/4 + i*Math.PI/2;
+      const m=new THREE.Mesh(new THREE.SphereGeometry(1,20,20),mat);
+      m.scale.set(1.9,0.9,0.9);
+      m.position.set(Math.cos(a)*1.9,Math.sin(a)*1.9,0);
+      m.rotation.z=a; g.add(m);
+    }
+    g.rotation.z=rotZ||0; return g;
+  }
+  function makeDz2(color){ // two lobes on z + torus ring
+    const g=new THREE.Group();
+    const mat=new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.22,transparent:true,opacity:.8,roughness:.45});
+    [1,-1].forEach(s=>{ const m=new THREE.Mesh(new THREE.SphereGeometry(1,20,20),mat); m.scale.set(1,1,2.4); m.position.z=s*2.4; g.add(m); });
+    const torus=new THREE.Mesh(new THREE.TorusGeometry(1.9,0.5,14,32),mat); g.add(torus);
+    return g;
+  }
+  function makeD(){ // 5 d-orbitals arranged in a small cluster
+    const g=new THREE.Group();
+    const set=[cloverleaf(ORB_COLORS.d,0),cloverleaf(ORB_COLORS.d,Math.PI/4),makeDz2(ORB_COLORS.d)];
+    set.forEach((o,i)=>{ o.position.x=(i-1)*0; }); // stacked; rely on rotation to read
+    // spread the three shown representatives around
+    set[0].position.set(-4.5,0,0); set[1].position.set(4.5,0,0); set[2].position.set(0,0,0);
+    set.forEach(o=>g.add(o)); return g;
+  }
+  function makeF(){ // simplified multi-lobe f representation
+    const g=new THREE.Group();
+    const mat=new THREE.MeshStandardMaterial({color:ORB_COLORS.f,emissive:ORB_COLORS.f,emissiveIntensity:.22,transparent:true,opacity:.78,roughness:.45});
+    for(let i=0;i<8;i++){ const a=i*Math.PI/4; const m=new THREE.Mesh(new THREE.SphereGeometry(1,18,18),mat);
+      m.scale.set(1.7,0.8,0.8); m.position.set(Math.cos(a)*2.1,Math.sin(a)*2.1,(i%2?1:-1)*1.2); m.rotation.z=a; g.add(m); }
+    return g;
+  }
+  function buildShapes(e){
+    if(!shapes.renderer) initShapes();
+    if(shapes.forEl===e){ shapes.controls.autoRotate=!reduceMotion; return; }
+    shapes.forEl=e;
+    if(shapes.group){ disposeObj(shapes.group); shapes.scene.remove(shapes.group); }
+    const g=new THREE.Group(); shapes.group=g; shapes.scene.add(g);
+    // which subshell types does this element occupy? (expand noble-gas core)
+    const present={s:false,p:false,d:false,f:false};
+    expandConfig(e.cfg).forEach(su=>{ present[su.l]=true; });
+    const builders={s:makeS(ORB_COLORS.s),p:makeP(),d:makeD(),f:makeF()};
+    const order=["s","p","d","f"].filter(k=>present[k]);
+    const spacing=15, x0=-(order.length-1)*spacing/2;
+    const legend=[]; const LEGNAMES={s:"s (sphere)",p:"p — pₓ pᵧ p_z",d:"d — 5 orbitals",f:"f — 7 orbitals"};
+    order.forEach((k,i)=>{ const o=builders[k]; o.position.x=x0+i*spacing; g.add(o); legend.push(k); });
+    // label + legend
+    document.getElementById("shapesLabel").textContent=`${e.name} — occupied orbital types: ${order.join(", ")}`;
+    const leg=document.getElementById("shapesLegend"); leg.innerHTML="";
+    const legcolors={s:ORB_COLORS.s,p:ORB_COLORS.py,d:ORB_COLORS.d,f:ORB_COLORS.f};
+    order.forEach(k=>{ const sp=document.createElement("span"); sp.innerHTML=`<i style="background:${legcolors[k]}"></i>${LEGNAMES[k]}`; leg.appendChild(sp); });
+    if(present.p){ ["pₓ:"+ORB_COLORS.px,"pᵧ:"+ORB_COLORS.py,"p_z:"+ORB_COLORS.pz].forEach(()=>{}); }
+    shapes.controls.autoRotate=!reduceMotion;
+    shapes.camera.position.set(0,7,34+order.length*4);
+    shapes.controls.update();
+  }
+  function renderShapes(){
+    if(!shapes.renderer||!shapes.group) return;
+    if(shapes.controls) shapes.controls.update();
+    shapes.renderer.render(shapes.scene,shapes.camera);
+  }
+
+  /* ---------- Orbital diagram ---------- */
+  const CORE={He:"1s2",Ne:"1s2 2s2 2p6",Ar:"1s2 2s2 2p6 3s2 3p6",
+    Kr:"1s2 2s2 2p6 3s2 3p6 4s2 3d10 4p6",
+    Xe:"1s2 2s2 2p6 3s2 3p6 4s2 3d10 4p6 5s2 4d10 5p6",
+    Rn:"1s2 2s2 2p6 3s2 3p6 4s2 3d10 4p6 5s2 4d10 5p6 6s2 4f14 5d10 6p6"};
+  const CAP={s:2,p:6,d:10,f:14}, BOXES={s:1,p:3,d:5,f:7};
+  function expandConfig(cfg){
+    cfg=cfg.replace(/\(.*?\)/g,"").trim();
+    const m=cfg.match(/^\[(\w\w?)\]/);
+    let full=cfg;
+    if(m&&CORE[m[1]]) full=CORE[m[1]]+" "+cfg.replace(m[0],"");
+    const toks=[...full.matchAll(/(\d)([spdf])(\d+)/g)].map(x=>({n:+x[1],l:x[2],e:+x[3]}));
+    const order={s:0,p:1,d:2,f:3};
+    toks.sort((a,b)=> a.n-b.n || order[a.l]-order[b.l]);
+    // merge dups
+    const map=new Map();
+    toks.forEach(t=>{const k=t.n+t.l; map.set(k,(map.get(k)||0)+t.e);});
+    return [...map.entries()].map(([k,e])=>({n:+k[0],l:k.slice(1),e})).sort((a,b)=>a.n-b.n||order[a.l]-order[b.l]);
+  }
+  function buildOrbital(e){
+    const p=document.getElementById("panel-orbital");
+    const subs=expandConfig(e.cfg);
+    let html=`<div class="config-line"><b>Electron configuration:</b> ${e.cfg}</div>`;
+    html+=`<div class="orb-note">Each box is one orbital; arrows are electrons (↑↓ = opposite spins). Filled by the aufbau principle and Hund's rule.</div>`;
+    subs.forEach(s=>{
+      const boxes=BOXES[s.l]; let e_left=s.e; const cells=[];
+      const arrows=new Array(boxes).fill("");
+      for(let i=0;i<boxes&&e_left>0;i++){arrows[i]="↑";e_left--;}
+      for(let i=0;i<boxes&&e_left>0;i++){arrows[i]="↑↓";e_left--;}
+      html+=`<div class="orb-row"><div class="lab">${s.n}${s.l}</div><div class="orb-boxes">`+
+        arrows.map(a=>`<div class="orb-box">${a}</div>`).join("")+`</div></div>`;
+    });
+    p.innerHTML=html;
+  }
+
+  /* ---------- Data & facts ---------- */
+  function buildData(e){
+    const p=document.getElementById("panel-data");
+    const grpTxt=(e.block==="f")?`— (${e.cat} series)`:e.group;
+    p.innerHTML=`
+      ${e.uses?`<div class="prose"><span class="tag">What it's used for</span>${e.uses}</div>`:""}
+      ${e.fact?`<div class="prose"><span class="tag">Did you know?</span>${e.fact}</div>`:""}
+      <h4 class="sec">Position</h4>
+      <div class="grid2">
+        <div class="dl"><span class="k">Group</span><span class="v">${grpTxt}</span></div>
+        <div class="dl"><span class="k">Period</span><span class="v">${e.period}</span></div>
+        <div class="dl"><span class="k">Block</span><span class="v">${e.block}-block</span></div>
+        <div class="dl"><span class="k">Category</span><span class="v">${e.cat}</span></div>
+      </div>
+      <h4 class="sec">Physical</h4>
+      <div class="grid2">
+        <div class="dl"><span class="k">Atomic mass</span><span class="v">${(+e.mass).toFixed(3)} u</span></div>
+        <div class="dl"><span class="k">State (25°C)</span><span class="v">${val(e.state)}</span></div>
+        <div class="dl"><span class="k">Density</span><span class="v">${val(e.density," g/cm³")}</span></div>
+        <div class="dl"><span class="k">Atomic radius</span><span class="v">${val(e.radius," pm")}</span></div>
+        <div class="dl"><span class="k">Melting point</span><span class="v">${fmtK(e.melt)}</span></div>
+        <div class="dl"><span class="k">Boiling point</span><span class="v">${fmtK(e.boil)}</span></div>
+      </div>
+      <h4 class="sec">Chemistry</h4>
+      <div class="grid2">
+        <div class="dl"><span class="k">Electron config</span><span class="v">${e.cfg}</span></div>
+        <div class="dl"><span class="k">Electrons/shell</span><span class="v">${e.shells.join(", ")}</span></div>
+        <div class="dl"><span class="k">Electronegativity</span><span class="v">${val(e.en)}</span></div>
+        <div class="dl"><span class="k">Ionization energy</span><span class="v">${val(e.ie," eV")}</span></div>
+        <div class="dl"><span class="k">Electron affinity</span><span class="v">${val(e.ea," eV")}</span></div>
+        <div class="dl"><span class="k">Oxidation states</span><span class="v">${val(e.ox)}</span></div>
+      </div>
+      <h4 class="sec">Discovery</h4>
+      <div class="grid2">
+        <div class="dl"><span class="k">Year discovered</span><span class="v">${val(e.year)}</span></div>
+        <div class="dl"><span class="k">Atomic number</span><span class="v">${e.n}</span></div>
+      </div>`;
+  }
+
+  /* ---------- ambient VFX: nebula + parallax starfield + shooting stars ---------- */
+  (function starfield(){
+    const cv=document.getElementById("bg"), cx=cv.getContext("2d");
+    let stars=[], nebula=[], shots=[], W=0, H=0, dpr=Math.min(2,window.devicePixelRatio||1);
+    const NEB_COLORS=[[80,120,255],[150,90,255],[40,180,200],[255,90,160]];
+
+    function resize(){
+      W=innerWidth; H=innerHeight;
+      cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px";
+      cx.setTransform(dpr,0,0,dpr,0,0);
+      const count=Math.round(W*H/7000);
+      stars=Array.from({length:count},()=>{
+        const depth=Math.random();            // 0 far … 1 near (parallax + size)
+        return {x:Math.random()*W,y:Math.random()*H,z:depth,
+          r:depth*1.6+0.25, base:depth*0.5+0.2,
+          tw:Math.random()*0.03+0.004, ph:Math.random()*6.28,
+          vx:(depth*0.12+0.02)*(Math.random()<.5?-1:1)};
+      });
+      nebula=Array.from({length:5},(_,i)=>({
+        x:Math.random()*W, y:Math.random()*H,
+        r:Math.max(W,H)*(0.28+Math.random()*0.28),
+        c:THEME_NEBULA[i%THEME_NEBULA.length],
+        vx:(Math.random()-.5)*0.06, vy:(Math.random()-.5)*0.05,
+        ph:Math.random()*6.28
+      }));
+    }
+    function spawnShot(){
+      const y=Math.random()*H*0.5;
+      shots.push({x:-60,y,vx:7+Math.random()*5,vy:2+Math.random()*2,life:1});
+    }
+    let last=0;
+    function draw(t){
+      cx.clearRect(0,0,W,H);
+      // nebula clouds (screen-blend glow)
+      cx.globalCompositeOperation="lighter";
+      for(const nb of nebula){
+        nb.x+=nb.vx; nb.y+=nb.vy; nb.ph+=0.004;
+        if(nb.x<-nb.r)nb.x=W+nb.r; if(nb.x>W+nb.r)nb.x=-nb.r;
+        if(nb.y<-nb.r)nb.y=H+nb.r; if(nb.y>H+nb.r)nb.y=-nb.r;
+        const a=0.05+Math.sin(nb.ph)*0.02;
+        const g=cx.createRadialGradient(nb.x,nb.y,0,nb.x,nb.y,nb.r);
+        g.addColorStop(0,`rgba(${nb.c[0]},${nb.c[1]},${nb.c[2]},${a})`);
+        g.addColorStop(1,"rgba(0,0,0,0)");
+        cx.fillStyle=g; cx.fillRect(nb.x-nb.r,nb.y-nb.r,nb.r*2,nb.r*2);
+      }
+      // stars
+      for(const s of stars){
+        s.ph+=s.tw; s.x+=s.vx; if(s.x<0)s.x=W; if(s.x>W)s.x=0;
+        const a=Math.max(0,s.base+Math.sin(s.ph)*0.25);
+        cx.beginPath(); cx.arc(s.x,s.y,s.r,0,6.283);
+        cx.fillStyle=`rgba(200,220,255,${a})`; cx.fill();
+        if(s.r>1.3){ cx.beginPath(); cx.arc(s.x,s.y,s.r*2.4,0,6.283); cx.fillStyle=`rgba(150,190,255,${a*0.12})`; cx.fill(); }
+      }
+      // shooting stars
+      for(let i=shots.length-1;i>=0;i--){
+        const sh=shots[i]; sh.x+=sh.vx; sh.y+=sh.vy; sh.life-=0.012;
+        const g=cx.createLinearGradient(sh.x,sh.y,sh.x-sh.vx*9,sh.y-sh.vy*9);
+        g.addColorStop(0,`rgba(255,255,255,${sh.life})`); g.addColorStop(1,"rgba(255,255,255,0)");
+        cx.strokeStyle=g; cx.lineWidth=2; cx.beginPath(); cx.moveTo(sh.x,sh.y); cx.lineTo(sh.x-sh.vx*9,sh.y-sh.vy*9); cx.stroke();
+        if(sh.life<=0||sh.x>W+80) shots.splice(i,1);
+      }
+      cx.globalCompositeOperation="source-over";
+      if(t-last>2600 && Math.random()<0.5){ spawnShot(); last=t; }
+      if(!reduceMotion) requestAnimationFrame(draw);
+    }
+    window.__applyNebula=()=>{ nebula.forEach((nb,i)=>{ nb.c=THEME_NEBULA[i%THEME_NEBULA.length]; }); };
+    addEventListener("resize",resize); resize(); if(reduceMotion){ draw(0); } else { requestAnimationFrame(draw); }
+  })();
+
+
+  /* ================= enhancement logic ================= */
+  function disposeObj(root){
+    root.traverse(o=>{
+      if(o.geometry) o.geometry.dispose();
+      if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose()); }
+    });
+  }
+
+  // colour-by selector, incl. the phase/temperature mode
+  function setColorMode(mode){
+    colorMode=mode;
+    const sel=document.getElementById("colorby"); if(sel) sel.value=mode;
+    document.getElementById("tempBar").classList.toggle("show", mode==="phase");
+    applyColors();
+    if(mode==="phase"){ phaseCaption(); }
+    else if(mode==="cat"){ if(CAPTIONS[curLayout]) setCaption(curLayout); }
+    else {
+      const NM={en:"Electronegativity",melt:"Melting point",boil:"Boiling point",radius:"Atomic radius",
+        ie:"Ionization energy",ea:"Electron affinity",mass:"Atomic mass",density:"Density"};
+      document.getElementById("caption").textContent=`Coloured by ${NM[mode]||mode} — blue (low) \u2192 red (high). Grey cards have no data.`;
+    }
+  }
+  function phaseCaption(){
+    document.getElementById("caption").textContent=
+      `Cards coloured by physical state at ${tempK} K (${(tempK-273.15).toFixed(0)}°C) — `+
+      `blue solid, green liquid, orange gas. Drag the slider to watch elements melt and boil.`;
+  }
+  function fmtTemp(T){ return `${T} K · ${(T-273.15).toFixed(0)}°C`; }
+  (function initTemp(){
+    const sl=document.getElementById("tempSlider"), lbl=document.getElementById("tempVal");
+    if(!sl) return;
+    lbl.textContent=fmtTemp(tempK);
+    sl.addEventListener("input",()=>{ tempK=+sl.value; lbl.textContent=fmtTemp(tempK);
+      if(colorMode==="phase"){ applyColors(); phaseCaption(); } });
+    const pr=document.getElementById("tempPreset");
+    if(pr) pr.addEventListener("click",()=>{ sl.value=298; sl.dispatchEvent(new Event("input")); });
+  })();
+
+  // table-view arrow-key navigation between neighbouring cards
+  let _posMap=null;
+  function buildPosMap(){ _posMap={}; const byNum={};
+    cards.forEach(c=>byNum[c.data.n]=c.el);
+    ELEMENTS.forEach(e=>{ _posMap[e.col+","+e.row]=byNum[e.n]; }); }
+  function handleCardArrow(ev,e){
+    const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[ev.key];
+    if(!d) return;
+    ev.preventDefault();
+    if(!_posMap) buildPosMap();
+    for(let step=1;step<=18;step++){
+      const t=_posMap[(e.col+d[0]*step)+","+(e.row+d[1]*step)];
+      if(t){ t.focus(); break; }
+    }
+  }
+
+  // detail overlay: step to previous / next element by atomic number
+  function stepEl(delta){
+    if(!current) return;
+    const idx=ELEMENTS.findIndex(x=>x.n===current.n), ni=idx+delta;
+    if(ni<0||ni>=ELEMENTS.length) return;
+    openDetail(ELEMENTS[ni]);
+  }
+  document.getElementById("prevEl").addEventListener("click",()=>stepEl(-1));
+  document.getElementById("nextEl").addEventListener("click",()=>stepEl(1));
+
+  // share / deep-link
+  function updateHash(){ if(current) history.replaceState(null,"","#"+current.sym); }
+  let _toastT;
+  function toast(msg){
+    const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
+    clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove("show"),2200);
+  }
+  document.getElementById("shareBtn").addEventListener("click",async()=>{
+    if(!current) return;
+    const url=location.origin+location.pathname+location.search+"#"+current.sym;
+    try{ await navigator.clipboard.writeText(url); toast("Link copied — "+current.name); }
+    catch(_){ location.hash=current.sym; toast("Link is in the address bar"); }
+  });
+  function openFromHash(){
+    const h=decodeURIComponent((location.hash||"").replace(/^#/,"")).trim();
+    if(!h) return;
+    const e=ELEMENTS.find(x=>x.sym.toLowerCase()===h.toLowerCase()||String(x.n)===h||x.name.toLowerCase()===h.toLowerCase());
+    if(e) openDetail(e);
+  }
+  window.addEventListener("hashchange",()=>{ if(location.hash) openFromHash(); });
+
+  // overlay: prev/next on arrows + a simple focus trap
+  document.addEventListener("keydown",ev=>{
+    if(!overlay.classList.contains("show")) return;
+    if(ev.key==="ArrowLeft"){ ev.preventDefault(); stepEl(-1); }
+    else if(ev.key==="ArrowRight"){ ev.preventDefault(); stepEl(1); }
+  });
+  overlay.addEventListener("keydown",ev=>{
+    if(ev.key!=="Tab") return;
+    const list=[...overlay.querySelectorAll('button,[tabindex]:not([tabindex="-1"]),canvas,input')]
+      .filter(x=>!x.disabled && x.offsetParent!==null);
+    if(!list.length) return;
+    const first=list[0], last=list[list.length-1];
+    if(ev.shiftKey && document.activeElement===first){ ev.preventDefault(); last.focus(); }
+    else if(!ev.shiftKey && document.activeElement===last){ ev.preventDefault(); first.focus(); }
+  });
+
+  // global keyboard shortcuts: 1-4 views, / focus search
+  window.addEventListener("keydown",ev=>{
+    if(document.body.classList.contains("gated")) return;
+    if(overlay.classList.contains("show")) return;
+    const tag=(ev.target.tagName||"").toLowerCase();
+    if(tag==="input"||tag==="select"||tag==="textarea") return;
+    if(ev.metaKey||ev.ctrlKey||ev.altKey) return;
+    if(ev.key==="/"){ ev.preventDefault(); const s=document.getElementById("search"); if(s) s.focus(); return; }
+    const views={"1":"table","2":"sphere","3":"helix","4":"grid"};
+    if(views[ev.key]) setLayout(views[ev.key]);
+  });
+
+  // pinch-to-zoom on the main 3D scene (touch)
+  function wireTouchZoom(){
+    const el=renderer && renderer.domElement; if(!el) return;
+    let d0=0;
+    const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+    el.addEventListener("touchstart",e=>{ if(e.touches.length===2) d0=dist(e.touches); },{passive:true});
+    el.addEventListener("touchmove",e=>{
+      if(e.touches.length!==2) return;
+      e.preventDefault();
+      const d=dist(e.touches); if(!d0){ d0=d; return; }
+      zoomBy(d>d0?0.985:1.015); d0=d;
+    },{passive:false});
+    el.addEventListener("touchend",e=>{ if(e.touches.length<2) d0=0; },{passive:true});
+  }
+
+  /* ================= auth (Firebase + guest) ================= */
+  // 1) Paste your Firebase web-app config here (Firebase console -> Project settings -> Your apps).
+  const firebaseConfig = {
+    apiKey: "AIzaSyBktxZW4oEZnyaNQ7Zyj28t5wNelryH_eE",
+    authDomain: "periodictable-8ff65.firebaseapp.com",
+    projectId: "periodictable-8ff65",
+    storageBucket: "periodictable-8ff65.firebasestorage.app",
+    messagingSenderId: "288128659647",
+    appId: "1:288128659647:web:db27e1a00e10f3de19d60a",
+    measurementId: "G-SHDNWZCETG"
+  };
+  const FB_READY = (typeof firebase !== "undefined") && !/YOUR_/.test(firebaseConfig.apiKey);
+  let _auth = null;
+  if(FB_READY){
+    try{
+      firebase.initializeApp(firebaseConfig);
+      _auth = firebase.auth();
+      _auth.onAuthStateChanged(u=>{ if(u && !u.isAnonymous) enterApp(u.email || "Account"); });
+    }catch(e){ console.warn("Firebase init failed:", e); }
+  }
+
+  function enterApp(who){
+    document.body.classList.remove("gated");
+    const acct=document.getElementById("acct");
+    if(acct){ acct.hidden=false; document.getElementById("acctBtn").textContent=who;
+      document.getElementById("acctWho").textContent=who; }
+  }
+  function authErr(msg){ const e=document.getElementById("authErr"); if(e) e.textContent=msg||""; }
+
+  let authMode="signin";
+  function setAuthMode(m){
+    authMode=m;
+    document.getElementById("tabSignin").classList.toggle("active",m==="signin");
+    document.getElementById("tabSignup").classList.toggle("active",m==="signup");
+    document.getElementById("authSubmit").textContent = m==="signin" ? "Sign in" : "Create account";
+    document.getElementById("authPass").autocomplete = m==="signin" ? "current-password" : "new-password";
+    authErr("");
+  }
+  document.getElementById("tabSignin").addEventListener("click",()=>setAuthMode("signin"));
+  document.getElementById("tabSignup").addEventListener("click",()=>setAuthMode("signup"));
+
+  document.getElementById("authForm").addEventListener("submit",async ev=>{
+    ev.preventDefault();
+    const email=document.getElementById("authEmail").value.trim();
+    const pass=document.getElementById("authPass").value;
+    if(!email || pass.length<6){ authErr("Enter an email and a password of at least 6 characters."); return; }
+    if(!FB_READY){ authErr("Firebase isn't configured yet — add your keys in the code, or continue as guest."); return; }
+    const btn=document.getElementById("authSubmit"); btn.disabled=true;
+    try{
+      if(authMode==="signin") await _auth.signInWithEmailAndPassword(email,pass);
+      else await _auth.createUserWithEmailAndPassword(email,pass);
+      // onAuthStateChanged reveals the app on success
+    }catch(e){ authErr(String(e.message||"Something went wrong").replace("Firebase:","").trim()); }
+    finally{ btn.disabled=false; }
+  });
+
+  document.getElementById("guestBtn").addEventListener("click",()=>{
+    try{ localStorage.setItem("pt-guest","1"); }catch(_){}
+    enterApp("Guest");
+  });
+
+  document.getElementById("acctBtn").addEventListener("click",()=>document.getElementById("acctMenu").classList.toggle("open"));
+  document.getElementById("signOutBtn").addEventListener("click",async()=>{
+    try{ localStorage.removeItem("pt-guest"); }catch(_){}
+    if(_auth && _auth.currentUser){ try{ await _auth.signOut(); }catch(_){} }
+    document.getElementById("acct").hidden=true;
+    document.getElementById("acctMenu").classList.remove("open");
+    document.body.classList.add("gated");
+  });
+
+  // returning guests skip the gate; note shown when Firebase isn't set up yet
+  (function initAuthGate(){
+    setAuthMode("signin");
+    if(!FB_READY){
+      document.getElementById("authNote").textContent =
+        "Email sign-in needs a free Firebase project (add your keys in this file). Guest mode works right now.";
+    }
+    let g=false; try{ g=localStorage.getItem("pt-guest")==="1"; }catch(_){}
+    if(g && !(_auth && _auth.currentUser)) enterApp("Guest");
+  })();
+
+  /* ================= theme factory ================= */
+  const THEMES={
+    cosmic:{bg1:"#1b2130",bg2:"#0b0d11",accent:"#5ab0ff",accent2:"#93bdff",nebula:[[80,120,255],[150,90,255],[40,180,200],[255,90,160]]},
+    galaxy:{bg1:"#2b1e3e",bg2:"#0c0814",accent:"#a490c2",accent2:"#c9b8e6",nebula:[[120,80,200],[160,110,220],[90,80,180],[210,150,240]]},
+    ocean:{bg1:"#17313f",bg2:"#060f16",accent:"#3fb0b0",accent2:"#a8dadc",nebula:[[40,150,150],[30,110,140],[80,180,180],[60,140,160]]},
+    tech:{bg1:"#14203a",bg2:"#060810",accent:"#3b82f6",accent2:"#00e5ff",nebula:[[0,120,255],[0,220,255],[40,90,220],[0,180,255]]},
+    ember:{bg1:"#3a2418",bg2:"#120a06",accent:"#f4a261",accent2:"#e76f51",nebula:[[231,111,81],[244,162,97],[233,196,106],[200,90,70]]},
+    forest:{bg1:"#1c3320",bg2:"#070f09",accent:"#a4ac86",accent2:"#c3cba6",nebula:[[80,140,90],[100,150,90],[60,120,80],[120,160,100]]}
+  };
+  function applyTheme(key){
+    const t=THEMES[key]||THEMES.cosmic, r=document.documentElement.style;
+    r.setProperty("--bg1",t.bg1); r.setProperty("--bg2",t.bg2);
+    r.setProperty("--accent",t.accent); r.setProperty("--accent2",t.accent2);
+    THEME_NEBULA.length=0; t.nebula.forEach(c=>THEME_NEBULA.push(c));
+    if(window.__applyNebula) window.__applyNebula();
+    const sel=document.getElementById("themeSel"); if(sel) sel.value=(THEMES[key]?key:"cosmic");
+    try{ localStorage.setItem("pt-theme",key); }catch(_){}
+  }
+  (function initTheme(){
+    const sel=document.getElementById("themeSel"); if(!sel) return;
+    sel.addEventListener("change",()=>applyTheme(sel.value));
+    let saved="cosmic"; try{ saved=localStorage.getItem("pt-theme")||"cosmic"; }catch(_){}
+    applyTheme(saved);
+  })();
+
+  init();
+  wireTouchZoom();
+  // keep the group/period bars clear of the caption when it grows to 2 lines
+  try{
+    const _cap=document.getElementById("caption"); let _capH=-1;
+    new MutationObserver(()=>{ const h=_cap.offsetHeight; if(h!==_capH){ _capH=h; layout(); } })
+      .observe(_cap,{childList:true,characterData:true,subtree:true});
+  }catch(_){}
+  openFromHash();
+  animate();
+  </script>
+
+  <!-- ================= Guide / About modal ================= -->
+  <script>
+  (function(){
+    const overlay=document.getElementById("infoOverlay");
+    const body=document.getElementById("infoBody");
+    const title=document.getElementById("infoTitle");
+    const eyebrow=document.getElementById("infoEyebrow");
+    let lastFocusInfo=null;
+
+    const GUIDE=`
+      <span class="tag">Install it like a real app</span>
+      <p>No app store and no download file — this installs straight to your home screen or desktop and even works offline after the first visit.</p>
+      <div class="infoStep"><div class="n">1</div><div class="t"><b>Android (Chrome):</b> tap the <b>⬇ Install app</b> button (top-right), or open the <b>⋮</b> menu and choose <b>Install app</b>.</div></div>
+      <div class="infoStep"><div class="n">2</div><div class="t"><b>iPhone / iPad (Safari):</b> tap the <b>Share</b> icon, scroll down, then tap <b>Add to Home Screen</b>.</div></div>
+      <div class="infoStep"><div class="n">3</div><div class="t"><b>Windows / Mac (Chrome or Edge):</b> click the <b>install icon</b> in the address bar, or the <b>⬇ Install app</b> button. It opens in its own window.</div></div>
+      <span class="tag">Quick controls</span>
+      <p><b>Views:</b> switch between Table, Sphere, Helix and Grid (or press keys <b>1–4</b>).<br>
+      <b>Search:</b> press <b>/</b> and type a name, symbol or number.<br>
+      <b>Reset:</b> the <b>↺</b> button (bottom-right) or press <b>R</b> recenters and re-zooms the current view.<br>
+      <b>Explore:</b> tap any element for its Bohr model, orbitals, trends and facts.</p>`;
+
+    const ABOUT=`
+      <div class="signchip"><span class="dot"></span>Created by Legit · Owned by Legit</div>
+      <p>I'm a developer who wanted to help students actually enjoy learning chemistry — so I built this free, interactive 3D periodic table. All 118 elements, their structures and trends, in one place.</p>
+      <p><b>No sign-ups. No email. No phone number.</b> Just open it and explore. Signing in is optional and only saves your theme — guest mode always works.</p>
+      <div class="oss">
+        <span class="tag">Open source &amp; free — forever</span>
+        <p>Want to make it better? You're welcome to use my code, on one condition: <b>keep it open-source and free for everyone</b>, exactly like this. Built for students, owned by no one but the community.</p>
+      </div>
+      <p style="text-align:center;opacity:.7;font-family:'Roboto Mono',monospace;font-size:.72rem;letter-spacing:1px;margin-top:14px;">MADE WITH ⚛ FOR CURIOUS MINDS</p>`;
+
+    function open(which){
+      if(which==="guide"){ title.textContent="Guide"; eyebrow.textContent="How to install & use"; body.innerHTML=GUIDE; }
+      else { title.textContent="About"; eyebrow.textContent="Interactive Periodic Table"; body.innerHTML=ABOUT; }
+      lastFocusInfo=document.activeElement;
+      overlay.classList.add("show");
+      body.scrollTop=0;
+      document.getElementById("infoClose").focus();
+    }
+    function close(){
+      overlay.classList.remove("show");
+      if(lastFocusInfo && lastFocusInfo.focus){ try{ lastFocusInfo.focus(); }catch(_){} }
+    }
+    document.getElementById("guideBtn").addEventListener("click",()=>open("guide"));
+    document.getElementById("aboutBtn").addEventListener("click",()=>open("about"));
+    document.getElementById("infoClose").addEventListener("click",close);
+    overlay.addEventListener("click",e=>{ if(e.target===overlay) close(); });
+    document.addEventListener("keydown",e=>{ if(e.key==="Escape" && overlay.classList.contains("show")) close(); });
+  })();
+  </script>
+
+  <!-- ================= PWA: install + offline ================= -->
+  <script>
+  (function(){
+    // Register the service worker (needed for install + offline). Runs only on http(s),
+    // so opening index.html via file:// simply skips it without errors.
+    if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+      window.addEventListener("load",()=>{
+        navigator.serviceWorker.register("sw.js").catch(err=>console.warn("SW registration failed:",err));
+      });
+    }
+
+    const btn=document.getElementById("installBtn");
+    let deferred=null;
+
+    // Chrome / Edge / Android: capture the install prompt and show our button.
+    window.addEventListener("beforeinstallprompt",(e)=>{
+      e.preventDefault(); deferred=e; if(btn) btn.hidden=false;
+    });
+    if(btn){
+      btn.addEventListener("click",async()=>{
+        if(deferred){
+          deferred.prompt();
+          try{ await deferred.userChoice; }catch(_){}
+          deferred=null; btn.hidden=true;
+        }else{
+          // iOS Safari has no prompt API — tell the user how to install manually.
+          const iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+          alert(iOS
+            ? "To install: tap the Share button, then \"Add to Home Screen\"."
+            : "To install: open your browser menu (⋮) and choose \"Install app\" / \"Add to Home screen\".");
+        }
+      });
+    }
+
+    // Hide the button once installed / when running as an installed app.
+    window.addEventListener("appinstalled",()=>{ if(btn) btn.hidden=true; });
+    if(window.matchMedia && matchMedia("(display-mode: standalone)").matches){ if(btn) btn.hidden=true; }
+
+    // iOS never fires beforeinstallprompt — surface the button so users know it's installable.
+    const iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    const standalone=(window.navigator.standalone===true)||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches);
+    if(iOS && !standalone && btn){ btn.hidden=false; }
+  })();
+  </script>
+</body>
+</html>
